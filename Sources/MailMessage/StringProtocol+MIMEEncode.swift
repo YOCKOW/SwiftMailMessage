@@ -108,7 +108,18 @@ internal final class _Parser {
       case (.visibleASCII, .mustBeEncoded(let encodees)):
         tokens._replaceLastElement(with: .mustBeEncoded(encodees._appending(scalar)))
       case (.other, .raw(let rawables)):
-        if rawables.allSatisfy({ $0._kind == .canBeLinearWhiteSpace }) {
+        if tokens.count == 1,
+           let spFirstIndex = rawables.firstIndex(where: { $0._kind == .canBeLinearWhiteSpace }),
+           spFirstIndex != rawables.startIndex
+        {
+          // Workaround for https://github.com/YOCKOW/SwiftMailMessage/issues/2
+          let spLastIndex = rawables.lastIndex(where: { $0._kind == .canBeLinearWhiteSpace })!
+          tokens = [
+            .raw(Array<Unicode.Scalar>(rawables[...spLastIndex])),
+            .mustBeEncoded(Array<Unicode.Scalar>(rawables[rawables.index(after: spLastIndex)...])),
+            .mustBeEncoded([scalar]),
+          ]
+        } else if rawables.allSatisfy({ $0._kind == .canBeLinearWhiteSpace }) {
           let beforeLast: Token? = ({ () -> Token? in
             guard tokens.count >= 2 else {
               return nil
