@@ -58,6 +58,15 @@ final class MailMessageTests: XCTestCase {
         .raw(__scalars(" ASCII ASCII"))
       ]
     )
+
+    // Confirm that [Issue#2](https://github.com/YOCKOW/SwiftMailMessage/issues/2) is fixed.
+    __assert(
+      "Subject: AlphabetsWithNoWhitespacesからの日本語",
+      expectedTokens: [
+        .raw(__scalars("Subject: ")),
+        .mustBeEncoded(__scalars("AlphabetsWithNoWhitespacesからの日本語")),
+      ]
+    )
   }
 
   func test_mimeEncode() throws {
