@@ -113,7 +113,7 @@ public final class ContentTransferEncodingStream: MIMESafeInputStream {
       result.append(contentsOf: data.base64EncodedData(options: .lineLength76Characters))
 
       // Workaround for https://bugs.swift.org/browse/SR-14496
-      #if canImport(ObjectiveC)
+      #if canImport(Darwin) || swift(>=5.6)
       result.append(contentsOf: .CRLF)
       #else
       if (1..<55).contains(data.count % numberOfBytesOfSourcePerLine) {
