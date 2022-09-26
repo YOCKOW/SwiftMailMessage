@@ -106,6 +106,13 @@ public struct Group: LosslessStringConvertible, BidirectionalCollection, RangeRe
     self.persons.append(contentsOf: persons)
   }
 
+  public mutating func replaceSubrange<C>(
+    _ subrange: Range<Array<Person>.Index>,
+    with newElements: C
+  ) where C: Collection, Person == C.Element {
+    self.persons.replaceSubrange(subrange, with: newElements)
+  }
+
   public subscript<T>(dynamicMember key: KeyPath<Array<Person>, T>) -> T {
     return persons[keyPath: key]
   }

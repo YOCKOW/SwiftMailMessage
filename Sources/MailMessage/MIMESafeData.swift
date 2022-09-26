@@ -281,6 +281,13 @@ public struct MIMESafeData: Equatable,
     }
   }
 
+  public mutating func replaceSubrange<C>(
+    _ subrange: Range<Data.Index>,
+    with newElements: C
+  ) where C: Collection, UInt7 == C.Element {
+    bytes.replaceSubrange(subrange, with: newElements.map(\._representation))
+  }
+
   @inlinable
   public func withUnsafeBytes<ResultType>(
     body : (UnsafeRawBufferPointer) throws -> ResultType
