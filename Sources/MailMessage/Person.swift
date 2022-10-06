@@ -15,18 +15,25 @@ public struct Person: LosslessStringConvertible, Equatable, Hashable {
   public var displayName: String?
 
   /// The person's mail address
-  public var mailAddress: String
+  public var mailAddress: MailAddress
 
-  public init(displayName: String? = nil, mailAddress: String) {
+  public init(displayName: String? = nil, mailAddress: MailAddress) {
     self.displayName = displayName
     self.mailAddress = mailAddress
   }
 
+  public init?(displayName: String? = nil, mailAddress: String) {
+    guard let mailAddress = MailAddress(mailAddress) else {
+      return nil
+    }
+    self.init(displayName: displayName, mailAddress: mailAddress)
+  }
+
   public var description: String {
     guard let displayName = self.displayName else {
-      return mailAddress
+      return mailAddress.description
     }
-    return "\(displayName) <\(mailAddress)>"
+    return "\(displayName) <\(mailAddress.description)>"
   }
 
   /// Instantiates an instance of the conforming type from a string representation.
@@ -40,7 +47,9 @@ public struct Person: LosslessStringConvertible, Equatable, Hashable {
       }
       let mailAddressStartIndex = valueDescription.index(after: ltIndex)
       let mailAddressEndIndex = valueDescription.index(before: valueDescription.endIndex)
-      let mailAddress = String(valueDescription[mailAddressStartIndex..<mailAddressEndIndex])
+      guard let mailAddress = MailAddress(String(valueDescription[mailAddressStartIndex..<mailAddressEndIndex])) else {
+        return nil
+      }
       let displayName = valueDescription[..<ltIndex].trimmingUnicodeScalars(in: .whitespacesAndNewlines)
       if displayName.isEmpty {
         self.init(displayName: nil, mailAddress: mailAddress)
@@ -48,7 +57,10 @@ public struct Person: LosslessStringConvertible, Equatable, Hashable {
         self.init(displayName: displayName, mailAddress: mailAddress)
       }
     } else {
-      self.init(mailAddress: valueDescription)
+      guard let mailAddress = MailAddress(valueDescription) else {
+        return nil
+      }
+      self.init(mailAddress: mailAddress)
     }
   }
 }

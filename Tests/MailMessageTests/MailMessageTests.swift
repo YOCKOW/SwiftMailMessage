@@ -24,6 +24,87 @@ private extension MIMESafeInputStream {
 }
 
 final class MailMessageTests: XCTestCase {
+  func test_mailAddress() {
+    func __test_wholeAddress(
+      _ string: String, isValid: Bool, file: StaticString = #filePath, line: UInt = #line
+    ) {
+      let maybeAddress = MailAddress(string)
+      if isValid {
+        XCTAssertNotNil(maybeAddress, "\(string) is expected to be valid.", file: file, line: line)
+
+        guard let address = maybeAddress else { return }
+        if case .ipAddress(let ipAddress) = address.domain, case .v6 = ipAddress {
+          return
+        }
+        let desc = address.description
+        XCTAssertEqual(desc, string, "\(string) is expected, but got \(desc)", file: file, line: line)
+      } else {
+        XCTAssertNil(maybeAddress, "\(string) is expected to be invalid.", file: file, line: line)
+      }
+    }
+
+    func __test_localPart(
+      _ localPart: String, isValid: Bool, file: StaticString = #filePath, line: UInt = #line
+    ) {
+      __test_wholeAddress("\(localPart)@example.com", isValid: isValid, file: file, line: line)
+    }
+
+    do { // https://qiita.com/yoshitake_1201/items/40268332cd23f67c504c
+      __test_localPart("abcdefghijklmnopqrstuvwxyz", isValid: true)
+      __test_localPart("ABCDEFGHIJKLMNOPQRSTUVWXYZ", isValid: true)
+      __test_localPart("0123456789", isValid: true)
+      __test_localPart("!#$%&'*+-/=?^_{|}~`", isValid: true)
+      __test_localPart("a.b", isValid: true)
+      __test_localPart("\"abcdefghijklmnopqrstuvwxyz\"", isValid: true)
+      __test_localPart("\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\"", isValid: true)
+      __test_localPart("\"0123456789\"", isValid: true)
+      __test_localPart("\"!#$%&'*+-/=?^_{|}~`\"", isValid: true)
+      __test_localPart("\".\"", isValid: true)
+      __test_localPart("\"..\"", isValid: true)
+      __test_localPart("\" ()*,:;<>@[]\"", isValid: true)
+      __test_localPart("\"\\a\\A\\0\\!\\.\"", isValid: true)
+      __test_localPart("0123456789012345678901234567890123456789012345678901234567890123", isValid: true) // 64 scalars
+
+      __test_localPart(".aaa", isValid: false)
+      __test_localPart("aaa.", isValid: false)
+      __test_localPart("a..a", isValid: false)
+      __test_localPart("()", isValid: false)
+      __test_localPart("\"aaa\"a", isValid: false)
+      __test_localPart("", isValid: false)
+      __test_localPart("01234567890123456789012345678901234567890123456789012345678901234", isValid: false) // 65 scalars
+    }
+
+    do { // https://en.wikipedia.org/wiki/Email_address
+      __test_wholeAddress("simple@example.com", isValid: true)
+      __test_wholeAddress("very.common@example.com", isValid: true)
+      __test_wholeAddress("disposable.style.email.with+symbol@example.com", isValid: true)
+      __test_wholeAddress("other.email-with-hyphen@example.com", isValid: true)
+      __test_wholeAddress("fully-qualified-domain@example.com", isValid: true)
+      __test_wholeAddress("user.name+tag+sorting@example.com", isValid: true)
+      __test_wholeAddress("x@example.com", isValid: true)
+      __test_wholeAddress("example-indeed@strange-example.com", isValid: true)
+      __test_wholeAddress("test/test@test.com", isValid: true)
+      __test_wholeAddress("admin@mailserver1", isValid: true)
+      __test_wholeAddress("example@s.example", isValid: true)
+      __test_wholeAddress(#"" "@example.org"#, isValid: true)
+      __test_wholeAddress(#""john..doe"@example.org"#, isValid: true)
+      __test_wholeAddress("mailhost!username@example.org", isValid: true)
+      __test_wholeAddress(#""very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com"#, isValid: true)
+      __test_wholeAddress("user%example.com@example.org", isValid: true)
+      __test_wholeAddress("user-@example.org", isValid: true)
+      __test_wholeAddress("postmaster@[123.123.123.123]", isValid: true)
+      __test_wholeAddress("postmaster@[IPv6:2001:0db8:85a3:0000:0000:8a2e:0370:7334]", isValid: true)
+
+      __test_wholeAddress("Abc.example.com", isValid: false)
+      __test_wholeAddress("A@b@c@example.com", isValid: false)
+      __test_wholeAddress(#"a"b(c)d,e:f;g<h>i[j\k]l@example.com"#, isValid: false)
+      __test_wholeAddress(#"just"not"right@example.com"#, isValid: false)
+      __test_wholeAddress(#"this is"not\allowed@example.com"#, isValid: false)
+      __test_wholeAddress(#"this\ still\"not\\allowed@example.com"#, isValid: false)
+      __test_wholeAddress("1234567890123456789012345678901234567890123456789012345678901234+x@example.com", isValid: false)
+    }
+  }
+
   func test_parser() {
     let parser = _Parser()
     func __assert(_ string: String, expectedTokens: [_Parser.Token],
@@ -115,11 +196,11 @@ final class MailMessageTests: XCTestCase {
     )
   }
 
-  func test_headerValues() {
-    let author = Person(displayName: "John Doe", mailAddress: "john.doe@example.com")
+  func test_headerValues() throws {
+    let author = try XCTUnwrap(Person(displayName: "John Doe", mailAddress: "john.doe@example.com"))
     let recipients = Group([
-      Person(displayName: "Jane Doe", mailAddress: "jane.doe@example.com"),
-      Person(mailAddress: "taro@example.com")
+      try XCTUnwrap(Person(displayName: "Jane Doe", mailAddress: "jane.doe@example.com")),
+      try XCTUnwrap(Person(mailAddress: "taro@example.com")),
     ])
     var header = MailMessage.Header()
     header.author = author
@@ -139,8 +220,10 @@ final class MailMessageTests: XCTestCase {
       contentTransferEncoding: ._7bit
     )
     let message = MailMessage(
-      author: Person(displayName: "Author", mailAddress: "author@example.com"),
-      recipients: Group([Person(displayName: "Recipient", mailAddress: "recipient@example.com")]),
+      author: try XCTUnwrap(Person(displayName: "Author", mailAddress: "author@example.com")),
+      recipients: Group([
+        try XCTUnwrap(Person(displayName: "Recipient", mailAddress: "recipient@example.com")),
+      ]),
       subject: "My First Mail Message. - 私の初めてのメールメッセージ -",
       body: body
     )
@@ -313,7 +396,9 @@ final class MailMessageTests: XCTestCase {
     richText.boundary = "test-boundary"
 
     let message = MailMessage(
-      recipients: Group([Person(mailAddress: "recipient@example.com")]),
+      recipients: Group([
+        try XCTUnwrap(Person(mailAddress: "recipient@example.com")),
+      ]),
       subject: "Rich Text Mail",
       body: richText
     )
@@ -349,7 +434,9 @@ final class MailMessageTests: XCTestCase {
     mailBody.boundary = "test-boundary"
 
     let message = MailMessage(
-      recipients: Group([Person(mailAddress: "recipient@example.com")]),
+      recipients: Group([
+        try XCTUnwrap(Person(mailAddress: "recipient@example.com"))
+      ]),
       subject: "Mail with attachments!",
       body: mailBody
     )
@@ -393,7 +480,7 @@ final class MailMessageTests: XCTestCase {
     )
   }
 
-  func test_fullMessage() {
+  func test_fullMessage() throws {
     let plainText = PlainText(
       text: "Hello, many resources!",
       stringEncoding: .ascii,
@@ -413,7 +500,9 @@ final class MailMessageTests: XCTestCase {
     var body = FileAttachedBody(mainBody: richText, files: [shortTextFile])
     body.boundary = "test-file-boundary"
     let message = MailMessage(
-      recipients: Group([Person(mailAddress: "recipient@example.com")]),
+      recipients: Group([
+        try XCTUnwrap(Person(mailAddress: "recipient@example.com"))
+      ]),
       subject: "Full Message",
       body: body
     )
