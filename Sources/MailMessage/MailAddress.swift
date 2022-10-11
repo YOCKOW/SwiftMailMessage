@@ -11,106 +11,399 @@ import Predicate
 import Ranges
 import yExtensions
 
-// MARK: - Local-part Validation
+// MARK: - Mail Address Parser
 
-private func _removeComment<S>(_ string: S) -> Substring? where S: StringProtocol, S.SubSequence == Substring {
-  if let open = string.firstIndex(of: "("), let close = string.lastIndex(of: ")") {
-    switch (open, close) {
-    case (string.startIndex, _):
-      return string[string.index(after: close)...]
-    case (_, string.index(before: string.endIndex)):
-      return string[..<open]
-    default:
-      return nil
-    }
-  }
-  return string[...]
-}
-
-private let _usableAnywhere: UnicodeScalarSet = UnicodeScalarSet(unicodeScalarsIn: "0"..."9")
+private let _availableAnywhere: UnicodeScalarSet = UnicodeScalarSet(unicodeScalarsIn: "0"..."9")
   .union(.init(unicodeScalarsIn: "A"..."Z"))
   .union(.init(unicodeScalarsIn: "a"..."z"))
   .union(.init(unicodeScalarsIn: "!#$%&'*+-/=?^_`{|}~"))
-private let _usableSymbolsInQuotes = UnicodeScalarSet(unicodeScalarsIn: " (),:;<>@[]")
-private let _usableSymbolsFollowingBackslashInQuotes = UnicodeScalarSet(unicodeScalarsIn: "\"\\\u{20}\u{09}")
-private let _VCHAR = UnicodeScalarSet(unicodeScalarsIn: "\u{21}"..<"\u{7F}")
+private let _availableSymbolsInQuote = UnicodeScalarSet(unicodeScalarsIn: ". (),:;<>@[]")
+private let _availableSymbolsFollowingBackslashInQuote = UnicodeScalarSet(unicodeScalarsIn: "\"\\\u{20}\u{09}")
+private let _visibles = UnicodeScalarSet(unicodeScalarsIn: "\u{21}"..<"\u{7F}")
+private let _availableInIPAddressLiteral = UnicodeScalarSet(unicodeScalarsIn: "0"..."9")
+  .union(.init(unicodeScalarsIn: "a"..."f"))
+  .union(.init(unicodeScalarsIn: "A"..."F"))
+  .union(.init(unicodeScalarsIn: ".:IPv6"))
 
-/// Validate local-part.
-///
-/// Thanks to `@yoshitake_1201`'s article:
-/// https://qiita.com/yoshitake_1201/items/40268332cd23f67c504c (Japanese).
-private func _validateLocalPart(_ scalars: Substring.UnicodeScalarView) -> Bool {
-  enum __Mode {
-    case quoted
-    case unquoted
+public enum MailAddressParserError: Error, Equatable {
+  // MARK: - Lexer Errors
+
+  case unterminatedQuotedString
+
+  case invalidScalarInQuotedString
+
+  case unterminatedIPAddressLiteral
+
+  case invalidScalarInIPAddressLiteral
+
+  case invalidIPAddressLiteral
+
+
+  // MARK: - Preparser Errors
+
+  case unbalancedParenthesis
+
+  // MARK: - Parser Errors
+
+  case tooLong
+
+  case duplicateAtSigns
+
+  case missingAtSign
+
+  case missingLocalPart
+
+  case missingDomain
+
+  case invalidCommentPosition
+
+  case invalidDomain
+
+  case consecutiveDots
+
+  case invalidDotPosition
+
+  case invalidScalarInLocalPart
+
+  case invalidQuotedStringPosition
+
+  case tooLongLocalPart
+}
+
+private extension IPAddress {
+  var _descriptionForMailAddress: String {
+    switch self {
+    case .v4:
+      return "[\(self.description)]"
+    case .v6:
+      return "[IPv6:\(self.description)]"
+    }
+  }
+}
+
+private func _quotedStringDescription(_ content: String) -> String {
+  var scalars = String.UnicodeScalarView()
+  scalars.append("\"")
+  for scalar in content.unicodeScalars {
+    switch scalar {
+    case "\\", "\"":
+      scalars.append("\\")
+      scalars.append(scalar)
+    default:
+      scalars.append(scalar)
+    }
+  }
+  scalars.append("\"")
+  return String(scalars)
+}
+
+internal class MailAddressToken {
+  class OpenComment: MailAddressToken {}
+
+  class CloseComment: MailAddressToken {}
+
+  class Dot: MailAddressToken {}
+
+  class AtSign: MailAddressToken {}
+
+  class IPAddress: MailAddressToken {
+    let ipAddress: NetworkGear.IPAddress
+
+    var description: String {
+      return ipAddress._descriptionForMailAddress
+    }
+
+    init(_ ipAddress: NetworkGear.IPAddress) {
+      self.ipAddress = ipAddress
+    }
   }
 
-  func __validate(_ scalars: Substring.UnicodeScalarView, mode: __Mode) -> Bool {
-    if scalars.isEmpty {
-      return false
-    }
-    if mode == .unquoted && (scalars.first == "." || scalars.last == ".") {
-      return false
+  class PlainText: MailAddressToken {
+    fileprivate(set) var scalars: String.UnicodeScalarView
+
+    var text: String {
+      return String(scalars)
     }
 
+    fileprivate init(_ scalar: Unicode.Scalar) {
+      self.scalars = .init([scalar])
+    }
+
+    internal init(_ scalars: String.UnicodeScalarView) {
+      self.scalars = scalars
+    }
+  }
+
+  class QuotedText: MailAddressToken {
+    let content: String
+
+    var description: String {
+      return _quotedStringDescription(content)
+    }
+    
+    internal init(_ content: String) {
+      self.content = content
+    }
+  }
+}
+
+extension MailAddressToken {
+  /// Split the given `string` into tokens as a mail address.
+  ///
+  /// Some characters may be omitted when they are not necessary for the address.
+  static func tokenize(_ string: String) throws -> [MailAddressToken] {
+    let scalars = string.unicodeScalars
     var index = scalars.startIndex
-    var escaping = false
-    var ii = 0
-    while index < scalars.endIndex {
-      defer { index = scalars.index(after: index); ii += 1 }
+    var result: [MailAddressToken] = []
 
+    func __next() { index = scalars.index(after: index) }
+
+    scan_scalars: while index < scalars.endIndex {
       let scalar = scalars[index]
 
-      if scalar == "\\" {
-        guard mode == .quoted else { return false }
-        escaping.toggle()
-        continue
-      }
-      if escaping {
-        assert(mode == .quoted)
-        guard _usableSymbolsFollowingBackslashInQuotes.contains(scalar) || _VCHAR.contains(scalar) else {
-          return false
+      // Quoted
+      if scalar == "\"" {
+        var content = String.UnicodeScalarView()
+        var escaping = false
+
+        consume_quoted: while index < scalars.endIndex {
+          __next()
+          guard index < scalars.endIndex else {
+            throw MailAddressParserError.unterminatedQuotedString
+          }
+          let quotedScalar = scalars[index]
+          if quotedScalar == "\\" {
+            if !escaping {
+              escaping = true
+              continue consume_quoted
+            }
+          }
+          if !escaping && quotedScalar == "\"" {
+            result.append(MailAddressToken.QuotedText(String(content)))
+            __next()
+            continue scan_scalars
+          }
+          guard (
+            _availableAnywhere.contains(quotedScalar) ||
+            _availableSymbolsInQuote.contains(quotedScalar) ||
+            (escaping && _availableSymbolsFollowingBackslashInQuote.contains(quotedScalar)) ||
+            (escaping && _visibles.contains(quotedScalar))
+          ) else {
+            throw MailAddressParserError.invalidScalarInQuotedString
+          }
+          content.append(quotedScalar)
+          escaping = false
         }
-        escaping = false
+      }
+
+      // IP Address
+      if scalar == "[" {
+        var maybeIPAddress = String.UnicodeScalarView()
+        consume_ip: while index < scalars.endIndex {
+          __next()
+          guard index < scalars.endIndex else {
+            throw MailAddressParserError.unterminatedIPAddressLiteral
+          }
+
+          let scalarInIPAddressLiteral = scalars[index]
+          if scalarInIPAddressLiteral == "]" {
+            var v6 = false
+            var maybeIPAddressDesc = String(maybeIPAddress)
+            if maybeIPAddressDesc.hasPrefix("IPv6:") {
+              maybeIPAddressDesc = String(maybeIPAddressDesc.dropFirst(5))
+              v6 = true
+            }
+            guard let ipAddress = NetworkGear.IPAddress(string: maybeIPAddressDesc) else {
+              throw MailAddressParserError.invalidIPAddressLiteral
+            }
+            if v6 {
+              guard case .v6 = ipAddress else {
+                throw MailAddressParserError.invalidIPAddressLiteral
+              }
+            }
+            result.append(MailAddressToken.IPAddress(ipAddress))
+            __next()
+            continue scan_scalars
+          }
+
+          guard _availableInIPAddressLiteral.contains(scalarInIPAddressLiteral) else {
+            throw MailAddressParserError.invalidScalarInIPAddressLiteral
+          }
+          maybeIPAddress.append(scalarInIPAddressLiteral)
+        }
+      }
+
+      if scalar == "(" {
+        result.append(MailAddressToken.OpenComment())
+        __next()
         continue
       }
 
-      if _usableAnywhere.contains(scalar) {
+      if scalar == ")" {
+        result.append(MailAddressToken.CloseComment())
+        __next()
         continue
       }
 
       if scalar == "." {
-        if mode == .quoted {
-          continue
-        }
-        assert(index > scalars.startIndex)
-        if scalars[scalars.index(before: index)] == "." {
-          // Dot does not appear consecutively
-          return false
-        }
+        result.append(MailAddressToken.Dot())
+        __next()
         continue
       }
 
-      guard mode == .quoted else { return false }
-      if _usableSymbolsInQuotes.contains(scalar) {
+      if scalar == "@" {
+        result.append(MailAddressToken.AtSign())
+        __next()
         continue
       }
-      return false
+
+      if let last = result.last, case let plainText as MailAddressToken.PlainText = last {
+        plainText.scalars.append(scalar)
+      } else {
+        result.append(MailAddressToken.PlainText(scalar))
+      }
+      __next()
     }
-    return true
+
+    return result
+  }
+}
+
+/// Abstract node for mail address.
+///
+/// This class exists for the purpose of debug.
+internal class MailAddressSyntaxNode {
+  class Comment: MailAddressSyntaxNode {
+    private(set) var children: [MailAddressSyntaxNode]
+
+    fileprivate override init() {
+      self.children = []
+    }
+
+    fileprivate func append(_ text: String) {
+      if let last = children.last, case let textToken as PlainText = last {
+        textToken.text += text
+      } else {
+        children.append(PlainText(text))
+      }
+    }
+
+    fileprivate func append(_ comment: Comment) {
+      children.append(comment)
+    }
   }
 
-  guard scalars.compareCount(with: 65) == .orderedAscending else {
-    return false
+  class Dot: MailAddressSyntaxNode {}
+
+  class AtSign: MailAddressSyntaxNode {}
+
+  class IPAddress: MailAddressSyntaxNode {
+    let ipAddress: NetworkGear.IPAddress
+
+    var description: String {
+      return ipAddress._descriptionForMailAddress
+    }
+
+    fileprivate init(_ ipAddress: NetworkGear.IPAddress) {
+      self.ipAddress = ipAddress
+    }
   }
 
-  if scalars.first == "\"" && scalars.last == "\"" {
-    return __validate(
-      scalars[scalars.index(after: scalars.startIndex)..<scalars.index(before: scalars.endIndex)],
-      mode: .quoted
-    )
+  class PlainText: MailAddressSyntaxNode {
+    fileprivate(set) var text: String
+
+    fileprivate init(_ text: String) {
+      self.text = text
+    }
   }
-  return __validate(scalars, mode: .unquoted)
+
+  class QuotedText: MailAddressSyntaxNode {
+    let content: String
+
+    fileprivate init(_ content: String) {
+      self.content = content
+    }
+  }
+}
+
+extension MailAddressSyntaxNode {
+  internal static func parse(_ tokens: [MailAddressToken]) throws -> [MailAddressSyntaxNode] {
+    var result: [MailAddressSyntaxNode] = []
+
+    var index = 0
+    scan_tokens: while index < tokens.count {
+      func __parseComment() throws -> Comment {
+        guard index < tokens.count else {
+          throw MailAddressParserError.unbalancedParenthesis
+        }
+
+        let token = tokens[index]
+        assert(token is MailAddressToken.OpenComment)
+
+        let comment = Comment()
+        consume_comment: while index < tokens.count {
+          index += 1
+          guard index < tokens.count else {
+            throw MailAddressParserError.unbalancedParenthesis
+          }
+
+          let token = tokens[index]
+          switch token {
+          case is MailAddressToken.CloseComment:
+            break consume_comment
+          case is MailAddressToken.OpenComment:
+            comment.append(try __parseComment())
+            continue consume_comment
+          case is MailAddressToken.Dot:
+            comment.append(".")
+            continue consume_comment
+          case is MailAddressToken.AtSign:
+            comment.append("@")
+            continue consume_comment
+          case let ipAddressToken as MailAddressToken.IPAddress:
+            comment.append(ipAddressToken.description)
+            continue consume_comment
+          case let plainTextToken as MailAddressToken.PlainText:
+            comment.append(plainTextToken.text)
+            continue consume_comment
+          case let quotedTextToken as MailAddressToken.QuotedText:
+            comment.append(quotedTextToken.description)
+            continue consume_comment
+          default:
+            fatalError("Unimplemented Token.")
+          }
+        }
+        return comment
+      }
+
+      let token = tokens[index]
+      switch token {
+      case is MailAddressToken.OpenComment:
+        result.append(try __parseComment())
+      case is MailAddressToken.CloseComment:
+        throw MailAddressParserError.unbalancedParenthesis
+      case is MailAddressToken.Dot:
+        result.append(Dot())
+      case is MailAddressToken.AtSign:
+        result.append(AtSign())
+      case let ipAddressToken as MailAddressToken.IPAddress:
+        result.append(IPAddress(ipAddressToken.ipAddress))
+      case let plainTextToken as MailAddressToken.PlainText:
+        if let last = result.last, case let lastText as MailAddressSyntaxNode.PlainText = last {
+          lastText.text += plainTextToken.text
+        } else {
+          result.append(PlainText(plainTextToken.text))
+        }
+      case let quotedTextToken as MailAddressToken.QuotedText:
+        result.append(QuotedText(quotedTextToken.content))
+      default:
+        fatalError("Unimplemented Token.")
+      }
+      index += 1
+    }
+
+    return result
+  }
 }
 
 // MARK: - Main Part
@@ -165,28 +458,188 @@ public struct MailAddress: Equatable, Hashable, LosslessStringConvertible {
     return "\(localPart)@\(domain.description)"
   }
 
-  /// Initializes with the given string removing comments in `local-part`.
-  /// Returns `nil` if it is invalid for a mail address.
-  public init?(_ string: String) {
-    guard string.compareCount(with: 255) == .orderedAscending else {
-      return nil
-    }
-    guard let lastAtMark = string.lastIndex(of: "@") else {
-      return nil
-    }
-    guard let domain = DomainPart(String(string[string.index(after: lastAtMark)...])) else {
-      return nil
-    }
-
-    var localPartDesc = string[..<lastAtMark]
-    if let commentRemoved = _removeComment(string[..<lastAtMark]) {
-      localPartDesc = commentRemoved
-    }
-    guard _validateLocalPart(localPartDesc.unicodeScalars) else {
-      return nil
-    }
-
+  private init(_validatedLocalPart: String, domain: DomainPart) {
+    self.localPart = _validatedLocalPart
     self.domain = domain
-    self.localPart = String(localPartDesc)
+  }
+
+  /// Parse the given `string` as a mail address. Comments will be removed.
+  /// An instance of `MailAddressParserError` may be thrown
+  /// if there is an error to parse the string.
+  public static func parse(_ string: String) throws -> MailAddress {
+    guard string.unicodeScalars.compareCount(with: 255) == .orderedAscending else {
+      throw MailAddressParserError.tooLong
+    }
+
+    let nodes = try MailAddressSyntaxNode.parse(MailAddressToken.tokenize(string))
+
+    // First, search the position to split the address into local-part and domain.
+    var indexOfAtSign: Int? = nil
+    for ii in 0..<nodes.count {
+      if nodes[ii] is MailAddressSyntaxNode.AtSign {
+        guard indexOfAtSign == nil else {
+          throw MailAddressParserError.duplicateAtSigns
+        }
+        indexOfAtSign = ii
+      }
+    }
+    guard let indexOfAtSign else {
+      throw MailAddressParserError.missingAtSign
+    }
+    guard indexOfAtSign > 0 else {
+      throw MailAddressParserError.missingLocalPart
+    }
+    guard indexOfAtSign < nodes.count - 1 else {
+      throw MailAddressParserError.missingDomain
+    }
+
+    var localPartNodes: ArraySlice<MailAddressSyntaxNode> = nodes[..<indexOfAtSign]
+    var domainPartNodes: ArraySlice<MailAddressSyntaxNode> = nodes[(indexOfAtSign + 1)...]
+
+    func __trimComments(_ nodes: inout ArraySlice<MailAddressSyntaxNode>) {
+      if nodes.first is MailAddressSyntaxNode.Comment {
+        nodes = nodes.dropFirst()
+      }
+      if nodes.last is MailAddressSyntaxNode.Comment {
+        nodes = nodes.dropLast()
+      }
+    }
+
+    __trimComments(&localPartNodes)
+    if localPartNodes.isEmpty {
+      throw MailAddressParserError.missingLocalPart
+    }
+
+    __trimComments(&domainPartNodes)
+    if domainPartNodes.isEmpty {
+      throw MailAddressParserError.missingDomain
+    }
+
+    if localPartNodes.contains(where: { $0 is MailAddressSyntaxNode.Comment }) ||
+       domainPartNodes.contains(where: { $0 is MailAddressSyntaxNode.Comment }) {
+      throw MailAddressParserError.invalidCommentPosition
+    }
+
+    // Validate DOMAIN PART
+
+    let domainPart: DomainPart = try ({
+      if domainPartNodes.count == 1 {
+        if case let ipAddressNode as MailAddressSyntaxNode.IPAddress = domainPartNodes.first {
+          return .ipAddress(ipAddressNode.ipAddress)
+        }
+        if case let plainTextNode as MailAddressSyntaxNode.PlainText = domainPartNodes.first {
+          guard let domain = Domain(plainTextNode.text) else {
+            throw MailAddressParserError.invalidDomain
+          }
+          return .domain(domain)
+        }
+        throw MailAddressParserError.invalidDomain
+      }
+
+      var domainDesc = ""
+      for node in domainPartNodes {
+        if node is MailAddressSyntaxNode.Dot {
+          if domainDesc.isEmpty {
+            throw MailAddressParserError.invalidDomain
+          }
+          if domainDesc.hasSuffix(".") {
+            throw MailAddressParserError.consecutiveDots
+          }
+          domainDesc += "."
+        } else if case let plainTextNode as MailAddressSyntaxNode.PlainText = node {
+          domainDesc += plainTextNode.text
+        } else {
+          throw MailAddressParserError.invalidDomain
+        }
+      }
+      guard let domain = Domain(domainDesc) else {
+        throw MailAddressParserError.invalidDomain
+      }
+      return .domain(domain)
+    })()
+
+
+    // Validate LOCAL PART
+
+    let localPart: String = try ({
+      if localPartNodes.first is MailAddressSyntaxNode.Dot ||
+         localPartNodes.last is MailAddressSyntaxNode.Dot  {
+        throw MailAddressParserError.invalidDotPosition
+      }
+
+      var localPart = ""
+
+      for ii in localPartNodes.startIndex..<localPartNodes.endIndex {
+        let node = localPartNodes[ii]
+
+        func __prevNode() -> MailAddressSyntaxNode? {
+          guard ii > localPartNodes.startIndex else {
+            return nil
+          }
+          return localPartNodes[localPartNodes.index(before: ii)]
+        }
+
+        func __nextNode() -> MailAddressSyntaxNode? {
+          let nextIndex = localPartNodes.index(after: ii)
+          guard nextIndex < localPartNodes.endIndex else {
+            return nil
+          }
+          return localPartNodes[nextIndex]
+        }
+
+        switch node {
+        case is MailAddressSyntaxNode.Dot:
+          if __nextNode() is MailAddressSyntaxNode.Dot {
+            throw MailAddressParserError.consecutiveDots
+          }
+          localPart += "."
+        case is MailAddressSyntaxNode.IPAddress:
+          throw MailAddressParserError.invalidScalarInLocalPart
+        case let plainTextNode as MailAddressSyntaxNode.PlainText:
+          let text = plainTextNode.text
+          guard text.unicodeScalars.allSatisfy({ _availableAnywhere.contains($0) }) else {
+            throw MailAddressParserError.invalidScalarInLocalPart
+          }
+          localPart += text
+        case let quotedTextNode as MailAddressSyntaxNode.QuotedText:
+          let prevNode = __prevNode()
+          guard prevNode == nil || prevNode is MailAddressSyntaxNode.Dot else {
+            throw MailAddressParserError.invalidQuotedStringPosition
+          }
+          let nextNode = __nextNode()
+          guard nextNode == nil || nextNode is MailAddressSyntaxNode.Dot else {
+            throw MailAddressParserError.invalidQuotedStringPosition
+          }
+
+          let text = quotedTextNode.content
+          if text.unicodeScalars.allSatisfy({ _availableAnywhere.contains($0) }) {
+            localPart += text
+          } else {
+            localPart += _quotedStringDescription(text)
+          }
+        default:
+          fatalError("Unexpected node.")
+        }
+      }
+
+      guard localPart.unicodeScalars.compareCount(with: 65) == .orderedAscending else {
+        throw MailAddressParserError.tooLongLocalPart
+      }
+
+      return localPart
+    })()
+
+    return .init(_validatedLocalPart: localPart, domain: domainPart)
+  }
+
+  /// Initializes with the given string removing comments.
+  /// Returns `nil` if it is invalid for a mail address.
+  ///
+  /// Use `MailAddress.parse` if you want to know _why_ the address is invalid.
+  public init?(_ string: String) {
+    guard let instance = try? MailAddress.parse(string) else {
+      return nil
+    }
+    self = instance
   }
 }

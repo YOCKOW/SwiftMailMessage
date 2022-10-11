@@ -24,6 +24,181 @@ private extension MIMESafeInputStream {
 }
 
 final class MailMessageTests: XCTestCase {
+  func test_mailAddressLexer() {
+    func __assert(
+      _ string: String,
+      _ expected: [(MailAddressToken) -> Bool],
+      expectedError: MailAddressParserError? = nil,
+      file: StaticString = #filePath,
+      line: UInt = #line
+    ) {
+      do {
+        let tokens = try MailAddressToken.tokenize(string)
+        guard tokens.count == expected.count else {
+          XCTFail("Unexpected number of tokens.", file: file, line: line)
+          return
+        }
+        for ii in 0..<tokens.count {
+          let token = tokens[ii]
+          XCTAssertTrue(expected[ii](token), "Unexpected token at #\(ii): \(token)", file: file, line: line)
+        }
+      } catch let error {
+        guard case let parserError as MailAddressParserError = error,
+              let expectedError,
+              parserError == expectedError else {
+          XCTFail("Unexpected error: \(error)", file: file, line: line)
+          return
+        }
+      }
+    }
+
+    func __isPlainText(_ token: MailAddressToken, _ expectedText: String) -> Bool {
+      guard case let plainTextToken as MailAddressToken.PlainText = token else {
+        return false
+      }
+      return plainTextToken.text == expectedText
+    }
+
+    func __isQuotedText(_ token: MailAddressToken, _ expectedText: String) -> Bool {
+      guard case let quotedTextToken as MailAddressToken.QuotedText = token else {
+        return false
+      }
+      return quotedTextToken.content == expectedText
+    }
+
+    func __isIPAddress(_ token: MailAddressToken, _ expectedIPAddress: IPAddress) -> Bool {
+      guard case let ipAddressToken as MailAddressToken.IPAddress = token else {
+        return false
+      }
+      return ipAddressToken.ipAddress == expectedIPAddress
+    }
+
+    __assert("(comment)", [
+      { $0 is MailAddressToken.OpenComment },
+      { __isPlainText($0, "comment") },
+      { $0 is MailAddressToken.CloseComment },
+    ])
+
+    __assert("(comment ( nested comment @ here ))", [
+      { $0 is MailAddressToken.OpenComment },
+      { __isPlainText($0, "comment ") },
+      { $0 is MailAddressToken.OpenComment },
+      { __isPlainText($0, " nested comment ") },
+      { $0 is MailAddressToken.AtSign },
+      { __isPlainText($0, " here ") },
+      { $0 is MailAddressToken.CloseComment },
+      { $0 is MailAddressToken.CloseComment },
+    ])
+
+    __assert("[127.0.0.1]", [
+      { __isIPAddress($0, .v4(127, 0, 0, 1)) },
+    ])
+
+    __assert("YOCKOW@(domain-side comment)[IPv6:2001:db8::1]", [
+      {  __isPlainText($0, "YOCKOW")},
+      { $0 is MailAddressToken.AtSign },
+      { $0 is MailAddressToken.OpenComment },
+      {  __isPlainText($0, "domain-side comment")},
+      { $0 is MailAddressToken.CloseComment },
+      { __isIPAddress($0, .v6(0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)) },
+    ])
+
+    __assert(#""..QUOTED.."."MORE"."ESCAPE\"\\""#, [
+      { __isQuotedText($0, "..QUOTED..") },
+      { $0 is MailAddressToken.Dot },
+      { __isQuotedText($0, "MORE") },
+      { $0 is MailAddressToken.Dot },
+      { __isQuotedText($0, "ESCAPE\"\\") },
+    ])
+
+    __assert(#""NEVER ENDING STORY"#, [], expectedError: .unterminatedQuotedString)
+    __assert(#""日本語""#, [], expectedError: .invalidScalarInQuotedString)
+    __assert("foo@[IPv6:2001:db8::1", [], expectedError: .unterminatedIPAddressLiteral)
+    __assert("foo@[127.0.0.X]", [], expectedError: .invalidScalarInIPAddressLiteral)
+    __assert("foo@[999.0.0.0]", [], expectedError: .invalidIPAddressLiteral)
+  }
+
+  func test_mailAddressPreparser() throws {
+    func __parse(_ string: String) throws -> [MailAddressSyntaxNode] {
+      return try MailAddressSyntaxNode.parse(MailAddressToken.tokenize(string))
+    }
+
+    nested_comment: do {
+      let nodes = try __parse("(comment (nested@1) (nested@2))")
+      guard nodes.count == 1 else {
+        XCTFail("Unexpected number of nodes.")
+        break nested_comment
+      }
+      guard case let commentNode as MailAddressSyntaxNode.Comment = nodes.first else {
+        XCTFail("Unexpected node.")
+        break nested_comment
+      }
+      guard commentNode.children.count == 4 else {
+        XCTFail("Unexpected number of children.")
+        break nested_comment
+      }
+      XCTAssertTrue(commentNode.children[0] is MailAddressSyntaxNode.PlainText)
+      XCTAssertTrue(commentNode.children[1] is MailAddressSyntaxNode.Comment)
+      XCTAssertTrue(commentNode.children[2] is MailAddressSyntaxNode.PlainText)
+      XCTAssertTrue(commentNode.children[3] is MailAddressSyntaxNode.Comment)
+      XCTAssertEqual(
+        ((commentNode.children[3] as? MailAddressSyntaxNode.Comment)?.children.first as? MailAddressSyntaxNode.PlainText)?.text,
+        "nested@2"
+      )
+    }
+
+    simple_address: do {
+      let nodes = try __parse(#"YOCKOW@example.com"#)
+      guard nodes.count == 5 else {
+        XCTFail("Unexpected number of nodes.")
+        break simple_address
+      }
+      XCTAssertEqual((nodes[0] as? MailAddressSyntaxNode.PlainText)?.text, "YOCKOW")
+      XCTAssertTrue(nodes[1] is MailAddressSyntaxNode.AtSign)
+      XCTAssertEqual((nodes[2] as? MailAddressSyntaxNode.PlainText)?.text, "example")
+      XCTAssertTrue(nodes[3] is MailAddressSyntaxNode.Dot)
+      XCTAssertEqual((nodes[4] as? MailAddressSyntaxNode.PlainText)?.text, "com")
+    }
+
+    XCTAssertThrowsError(try __parse("(foo (bar)")) {
+      XCTAssertEqual($0 as? MailAddressParserError, .unbalancedParenthesis)
+    }
+  }
+
+  func test_mailAddressParserError() {
+    func __assert(
+      _ string: String, expectedError: MailAddressParserError,
+      file: StaticString = #filePath, line: UInt = #line
+    ) {
+      do {
+        let address = try MailAddress.parse(string)
+        XCTFail("Unexpected success: localPart=\(address.localPart); domain=\(address.domain.description)", file: file, line: line)
+      } catch let error {
+        guard case let parseError as MailAddressParserError = error else {
+          XCTFail("Unexpected error: \(error)", file: file, line: line)
+          return
+        }
+        XCTAssertEqual(parseError, expectedError, file: file, line: line)
+      }
+    }
+
+    __assert("a@" + String(repeating: "foo.", count: 70) + "com", expectedError: .tooLong)
+    __assert("foo@bar@example.com", expectedError: .duplicateAtSigns)
+    __assert("foo.bar.baz", expectedError: .missingAtSign)
+    __assert("(comment)@example.com", expectedError: .missingLocalPart)
+    __assert("foo@(comment)", expectedError: .missingDomain)
+    __assert("foo(comment)bar@example.com", expectedError: .invalidCommentPosition)
+    __assert("foo.bar@example.(comment)com", expectedError: .invalidCommentPosition)
+    __assert("foo@----.com", expectedError: .invalidDomain)
+    __assert("foo@example..com", expectedError: .consecutiveDots)
+    __assert("foo..bar@example.com", expectedError: .consecutiveDots)
+    __assert(".foo@example.com", expectedError: .invalidDotPosition)
+    __assert("foo.@example.com", expectedError: .invalidDotPosition)
+    __assert("foo,bar@example.com", expectedError: .invalidScalarInLocalPart)
+    __assert(#""foo""bar"@example.com"#, expectedError: .invalidQuotedStringPosition)
+    __assert(String(repeating: "foo", count: 30) + "@example.com", expectedError: .tooLongLocalPart)
+  }
+
   func test_mailAddress() {
     func __test_wholeAddress(
       _ string: String, isValid: Bool, file: StaticString = #filePath, line: UInt = #line
@@ -31,13 +206,6 @@ final class MailMessageTests: XCTestCase {
       let maybeAddress = MailAddress(string)
       if isValid {
         XCTAssertNotNil(maybeAddress, "\(string) is expected to be valid.", file: file, line: line)
-
-        guard let address = maybeAddress else { return }
-        if case .ipAddress(let ipAddress) = address.domain, case .v6 = ipAddress {
-          return
-        }
-        let desc = address.description
-        XCTAssertEqual(desc, string, "\(string) is expected, but got \(desc)", file: file, line: line)
       } else {
         XCTAssertNil(maybeAddress, "\(string) is expected to be invalid.", file: file, line: line)
       }
