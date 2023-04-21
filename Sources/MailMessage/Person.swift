@@ -1,11 +1,12 @@
 /* *************************************************************************************************
  Person.swift
-   © 2021 YOCKOW.
+   © 2021,2023 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
 
-import BonaFideCharacterSet
+import UnicodeSupplement
+import yExtensions
 
 /// Represents `mailbox` defined in [RFC 5322](https://tools.ietf.org/html/rfc5322).
 ///
@@ -40,7 +41,7 @@ public struct Person: LosslessStringConvertible, Equatable, Hashable {
   ///
   /// Validation is poor as of now.
   public init?(_ description: String) {
-    let valueDescription = description.trimmingUnicodeScalars(in: .whitespacesAndNewlines)
+    let valueDescription = description.trimmingUnicodeScalars(where: \.latestProperties.isWhitespace || \.latestProperties.isNewline)
     if valueDescription.hasSuffix(">") {
       guard let ltIndex = valueDescription.lastIndex(of: "<") else {
         return nil
@@ -50,7 +51,7 @@ public struct Person: LosslessStringConvertible, Equatable, Hashable {
       guard let mailAddress = MailAddress(String(valueDescription[mailAddressStartIndex..<mailAddressEndIndex])) else {
         return nil
       }
-      let displayName = valueDescription[..<ltIndex].trimmingUnicodeScalars(in: .whitespacesAndNewlines)
+      let displayName = valueDescription[..<ltIndex].trimmingUnicodeScalars(where: \.latestProperties.isWhitespace || \.latestProperties.isNewline)
       if displayName.isEmpty {
         self.init(displayName: nil, mailAddress: mailAddress)
       } else {
@@ -143,7 +144,7 @@ public struct Group: LosslessStringConvertible, BidirectionalCollection, RangeRe
   }
 
   public init?(_ description: String) {
-    let valueDescription = description.trimmingUnicodeScalars(in: .whitespacesAndNewlines)
+    let valueDescription = description.trimmingUnicodeScalars(where: \.latestProperties.isWhitespace || \.latestProperties.isNewline)
     var persons: [Person] = []
     for personDescription in valueDescription.split(separator: ",") {
       guard let person = Person(String(personDescription)) else { return nil }

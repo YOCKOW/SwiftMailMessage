@@ -416,7 +416,7 @@ internal func _mimeEncodedParameter(
   let nameCount = name.count
   let nPerLine = 75
 
-  if value.consists(of: .mimeTypeTokenAllowed) &&
+  if value.unicodeScalars.allSatisfy(\.isMIMETypeToken) &&
       nameCount + 1 + value.count < nPerLine {
     return try " \(name)=\(value)".mimeSafeData(using: ._7bit, stringEncoding: .utf8)
   } else if let quoted = value._quoted,
@@ -496,9 +496,9 @@ private func _mimeEncodedHeaderField(
   var ii = 0
   while ii < parameterPairs.count {
     let (name, value) = parameterPairs[ii]
-    assert(name.consists(of: .mimeTypeTokenAllowed))
+    assert(name.unicodeScalars.allSatisfy(\.isMIMETypeToken))
     let nameCount = name.count
-    if value.consists(of: .mimeTypeTokenAllowed) &&
+    if value.unicodeScalars.allSatisfy(\.isMIMETypeToken) &&
         result.count + 2 + nameCount + 1 + value.count < 76 {
       result += try "; \(name)=\(value)".mimeSafeData(using: ._7bit, stringEncoding: .utf8)
     } else if let quoted = value._quoted,
