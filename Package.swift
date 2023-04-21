@@ -17,12 +17,12 @@ let package = Package(
   ],
   dependencies: [
     // Dependencies declare other packages that this package depends on.
-    .package(url:"https://github.com/YOCKOW/SwiftBonaFideCharacterSet.git", from: "1.6.2"),
-    .package(url:"https://github.com/YOCKOW/SwiftNetworkGear.git", "0.14.8"..<"2.0.0"),
+    .package(url:"https://github.com/YOCKOW/SwiftNetworkGear.git", "0.16.0"..<"2.0.0"),
     .package(url:"https://github.com/YOCKOW/SwiftPredicate.git", from: "1.2.1"),
     .package(url:"https://github.com/YOCKOW/SwiftRanges.git", from: "3.1.2"),
-    .package(url:"https://github.com/YOCKOW/SwiftXHTML.git", from: "2.5.2"),
-    .package(url:"https://github.com/YOCKOW/ySwiftExtensions.git", from: "1.7.5"),
+    .package(url:"https://github.com/YOCKOW/SwiftUnicodeSupplement.git", from: "1.3.0"),
+    .package(url:"https://github.com/YOCKOW/SwiftXHTML.git", from: "2.6.0"),
+    .package(url:"https://github.com/YOCKOW/ySwiftExtensions.git", from: "1.9.0"),
   ],
   targets: [
     // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -30,10 +30,10 @@ let package = Package(
     .target(
       name: "MailMessage",
       dependencies: [
-        "SwiftBonaFideCharacterSet",
         "SwiftNetworkGear",
         "SwiftPredicate",
         "SwiftRanges",
+        "SwiftUnicodeSupplement",
         "SwiftXHTML",
         "ySwiftExtensions",
       ]

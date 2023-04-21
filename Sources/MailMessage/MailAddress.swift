@@ -1,11 +1,10 @@
 /* *************************************************************************************************
  MailAddress.swift
-   © 2022 YOCKOW.
+   © 2022-2023 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
 
-import BonaFideCharacterSet
 import NetworkGear
 import Predicate
 import Ranges
@@ -13,17 +12,47 @@ import yExtensions
 
 // MARK: - Mail Address Parser
 
-private let _availableAnywhere: UnicodeScalarSet = UnicodeScalarSet(unicodeScalarsIn: "0"..."9")
-  .union(.init(unicodeScalarsIn: "A"..."Z"))
-  .union(.init(unicodeScalarsIn: "a"..."z"))
-  .union(.init(unicodeScalarsIn: "!#$%&'*+-/=?^_`{|}~"))
-private let _availableSymbolsInQuote = UnicodeScalarSet(unicodeScalarsIn: ". (),:;<>@[]")
-private let _availableSymbolsFollowingBackslashInQuote = UnicodeScalarSet(unicodeScalarsIn: "\"\\\u{20}\u{09}")
-private let _visibles = UnicodeScalarSet(unicodeScalarsIn: "\u{21}"..<"\u{7F}")
-private let _availableInIPAddressLiteral = UnicodeScalarSet(unicodeScalarsIn: "0"..."9")
-  .union(.init(unicodeScalarsIn: "a"..."f"))
-  .union(.init(unicodeScalarsIn: "A"..."F"))
-  .union(.init(unicodeScalarsIn: ".:IPv6"))
+private extension Set where Element == Unicode.Scalar {
+  init(_ closedRanges: ClosedRange<Unicode.Scalar>...) {
+    self.init()
+    for closedRange in closedRanges {
+      for ii in closedRange.lowerBound.value...closedRange.upperBound.value {
+        guard let scalar = Unicode.Scalar(ii) else { fatalError("Unexpected scalar value.") }
+        self.insert(scalar)
+      }
+    }
+  }
+}
+
+private extension Unicode.Scalar {
+  var _isAvailableAnywhere: Bool {
+    enum __Available {
+      static let scalars = Set<Unicode.Scalar>("0"..."9", "A"..."Z", "a"..."z").union("!#$%&'*+-/=?^_`{|}~".unicodeScalars)
+    }
+    return __Available.scalars.contains(self)
+  }
+
+  var _isAvailableSymbolInQuote: Bool {
+    enum __Available { static let scalars = Set<Unicode.Scalar>(". (),:;<>@[]".unicodeScalars) }
+    return __Available.scalars.contains(self)
+  }
+
+  var _isAvailableSymbolFollowingBackslashInQuote: Bool {
+    enum __Available { static let scalars = Set<Unicode.Scalar>("\"\\\u{20}\u{09}".unicodeScalars) }
+    return __Available.scalars.contains(self)
+  }
+
+  var _isVisible: Bool {
+    return ("\u{21}"..<"\u{7F}").contains(self)
+  }
+
+  var _isAvailableInIPAddressLiteral: Bool {
+    enum __Available {
+      static let scalars = Set<Unicode.Scalar>("0"..."9", "A"..."F", "a"..."f").union(".:IPv6".unicodeScalars)
+    }
+    return __Available.scalars.contains(self)
+  }
+}
 
 public enum MailAddressParserError: Error, Equatable {
   // MARK: - Lexer Errors
@@ -184,10 +213,10 @@ extension MailAddressToken {
             continue scan_scalars
           }
           guard (
-            _availableAnywhere.contains(quotedScalar) ||
-            _availableSymbolsInQuote.contains(quotedScalar) ||
-            (escaping && _availableSymbolsFollowingBackslashInQuote.contains(quotedScalar)) ||
-            (escaping && _visibles.contains(quotedScalar))
+            quotedScalar._isAvailableAnywhere ||
+            quotedScalar._isAvailableSymbolInQuote ||
+            (escaping && quotedScalar._isAvailableSymbolFollowingBackslashInQuote) ||
+            (escaping && quotedScalar._isVisible)
           ) else {
             throw MailAddressParserError.invalidScalarInQuotedString
           }
@@ -226,7 +255,7 @@ extension MailAddressToken {
             continue scan_scalars
           }
 
-          guard _availableInIPAddressLiteral.contains(scalarInIPAddressLiteral) else {
+          guard scalarInIPAddressLiteral._isAvailableInIPAddressLiteral else {
             throw MailAddressParserError.invalidScalarInIPAddressLiteral
           }
           maybeIPAddress.append(scalarInIPAddressLiteral)
@@ -597,7 +626,7 @@ public struct MailAddress: Equatable, Hashable, LosslessStringConvertible {
           throw MailAddressParserError.invalidScalarInLocalPart
         case let plainTextNode as MailAddressSyntaxNode.PlainText:
           let text = plainTextNode.text
-          guard text.unicodeScalars.allSatisfy({ _availableAnywhere.contains($0) }) else {
+          guard text.unicodeScalars.allSatisfy(\._isAvailableAnywhere) else {
             throw MailAddressParserError.invalidScalarInLocalPart
           }
           localPart += text
@@ -612,7 +641,7 @@ public struct MailAddress: Equatable, Hashable, LosslessStringConvertible {
           }
 
           let text = quotedTextNode.content
-          if text.unicodeScalars.allSatisfy({ _availableAnywhere.contains($0) }) {
+          if text.unicodeScalars.allSatisfy(\._isAvailableAnywhere) {
             localPart += text
           } else {
             localPart += _quotedStringDescription(text)
