@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  Person.swift
-   © 2021,2023 YOCKOW.
+   © 2021,2023-2024 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -11,7 +11,7 @@ import yExtensions
 /// Represents `mailbox` defined in [RFC 5322](https://tools.ietf.org/html/rfc5322).
 ///
 /// Note: Each properties will not be validated as of now.
-public struct Person: LosslessStringConvertible, Equatable, Hashable {
+public struct Person: LosslessStringConvertible, Equatable, Hashable, Sendable {
   /// The person's name
   public var displayName: String?
 
@@ -68,7 +68,12 @@ public struct Person: LosslessStringConvertible, Equatable, Hashable {
 
 /// Represents `"group"`defined in [RFC 5322](https://tools.ietf.org/html/rfc5322).
 @dynamicMemberLookup
-public struct Group: LosslessStringConvertible, BidirectionalCollection, RangeReplaceableCollection, Equatable, Hashable {
+public struct Group: LosslessStringConvertible,
+                     BidirectionalCollection,
+                     RangeReplaceableCollection,
+                     Equatable,
+                     Hashable,
+                     Sendable {
   public var persons: [Person]
 
   public typealias Iterator =  Array<Person>.Iterator

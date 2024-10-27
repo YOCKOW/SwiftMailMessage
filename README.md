@@ -5,7 +5,7 @@ It does *not* provide functions like a mailer.
 
 # Requirements
 
-- Swift 5
+- Swift 5, 6
 - macOS(>=10.15) or Linux
 
 ## Dependencies

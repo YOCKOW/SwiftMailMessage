@@ -13,7 +13,7 @@ import yExtensions
 /// [RFC 2045 §7](https://tools.ietf.org/html/rfc2045#section-7).
 /// It consists of the same characters with "Message-ID" defined in
 /// [RFC 5322 §3.6.4](https://tools.ietf.org/html/rfc5322#section-3.6.4).
-public struct ContentID: RawRepresentable {
+public struct ContentID: RawRepresentable, Sendable {
   public typealias RawValue = String
 
   /// `dot-atom-text`

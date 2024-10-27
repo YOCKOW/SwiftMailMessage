@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  ContentTransferEncoding.swift
-   © 2021 YOCKOW.
+   © 2021,2024 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -8,7 +8,7 @@
 import Foundation
 import NetworkGear
 
-public enum ContentTransferEncodingError: Error {
+public enum ContentTransferEncodingError: Error, Sendable {
   case cannotEncode
   case non7bitRepresentation
   case unexpectedError
@@ -88,7 +88,7 @@ public final class ContentTransferEncodingStream: MIMESafeInputStream {
     }
   }
 
-  private static let _encoders: [ContentTransferEncoding: (ContentTransferEncodingStream) throws -> MIMESafeData?] = [
+  private static let _encoders: [ContentTransferEncoding: @Sendable (ContentTransferEncodingStream) throws -> MIMESafeData?] = [
     ._7bit: {
       guard let data = try $0.input._getBytes($0._buffer, maxLength: $0._bufferSize),
             !data.isEmpty else {
