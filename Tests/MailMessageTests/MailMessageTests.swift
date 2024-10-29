@@ -9,6 +9,15 @@ import Foundation
 import NetworkGear
 import XHTML
 @testable import MailMessage
+import yExtensions
+
+func ifFoundationIssue1014IsFixed(_ name: String = #function, _ body: () throws -> Void) rethrows {
+  #if compiler(>=6) && !canImport(Darwin)
+  warn("⏭︎ Test '\(name)' is skipped due to https://github.com/swiftlang/swift-foundation/issues/1014")
+  #else
+  try body()
+  #endif
+}
 
 private let CRLF: String = "\u{0D}\u{0A}"
 private let resourcesDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources", isDirectory: true)
@@ -317,29 +326,34 @@ import Testing
       try "ひらがな ASCII 漢字".mimeEncodedString(using: .utf8) ==
       "=?utf-8?B?44Gy44KJ44GM44Gq?= ASCII =?utf-8?B?5ryi5a2X?="
     )
-    // Example from http://www.din.or.jp/~ohzaki/perl.htm#JP_Base64
-    #expect(
-      try "Subject: ASCII 日本語 ASCIIと日本語 ASCII ASCII".mimeEncodedString(using: .iso2022JP) ==
-      [
-        "Subject: ASCII =?iso-2022-jp?B?GyRCRnxLXDhsGyhCIEFTQ0lJGyRCJEhGfEtcGyhC?=",
-        "=?iso-2022-jp?B?GyRCOGwbKEI=?= ASCII ASCII",
-      ].joined(separator: "\u{0D}\u{0A}\u{20}")
-    )
+
+    try ifFoundationIssue1014IsFixed("Subject ISO-2022-JP Encoding") { () throws -> Void in // https://github.com/swiftlang/swift/issues/75256
+      // Example from http://www.din.or.jp/~ohzaki/perl.htm#JP_Base64
+      #expect(
+        try "Subject: ASCII 日本語 ASCIIと日本語 ASCII ASCII".mimeEncodedString(using: .iso2022JP) ==
+        [
+          "Subject: ASCII =?iso-2022-jp?B?GyRCRnxLXDhsGyhCIEFTQ0lJGyRCJEhGfEtcGyhC?=",
+          "=?iso-2022-jp?B?GyRCOGwbKEI=?= ASCII ASCII",
+        ].joined(separator: "\u{0D}\u{0A}\u{20}")
+      )
+    }
   }
 
   @Test func test_mimeEncode_parameter() throws {
-    #expect(
-      String(data: try _mimeEncodedParameter(
-        name: "filename",
-        value: "とてもとても長い長い日本語の名前のファイル.txt",
-        encoding: .iso2022JP,
-        locale: Locale(identifier: "ja_JP")
-      )) ==
-      """
-       filename*0*=iso-2022-jp'ja'%1B$B$H$F$b$H$F$bD9$$D9$$F%7CK%5C8l$N%1B%28B;\(CRLF)\
-       filename*1*=%1B$BL%3EA0$N%25U%25%21%25$%25k%1B%28B.txt
-      """
-    )
+    try ifFoundationIssue1014IsFixed { () throws -> Void in // https://github.com/swiftlang/swift/issues/75256
+      #expect(
+        String(data: try _mimeEncodedParameter(
+          name: "filename",
+          value: "とてもとても長い長い日本語の名前のファイル.txt",
+          encoding: .iso2022JP,
+          locale: Locale(identifier: "ja_JP")
+        )) ==
+        """
+         filename*0*=iso-2022-jp'ja'%1B$B$H$F$b$H$F$bD9$$D9$$F%7CK%5C8l$N%1B%28B;\(CRLF)\
+         filename*1*=%1B$BL%3EA0$N%25U%25%21%25$%25k%1B%28B.txt
+        """
+      )
+    }
   }
 
   @Test func test_mimeEncode_contentType() throws {
@@ -369,37 +383,39 @@ import Testing
   }
 
   @Test func test_plainText() throws {
-    let body = PlainText(
-      text: """
-        Hello, World!
-        こんにちは、世界！
-        """,
-      stringEncoding: .iso2022JP,
-      contentTransferEncoding: ._7bit
-    )
-    let message = MailMessage(
-      author: try #require(Person(displayName: "Author", mailAddress: "author@example.com")),
-      recipients: Group([
-        try #require(Person(displayName: "Recipient", mailAddress: "recipient@example.com")),
-      ]),
-      subject: "My First Mail Message. - 私の初めてのメールメッセージ -",
-      body: body
-    )
+    try ifFoundationIssue1014IsFixed { () throws -> Void in // https://github.com/swiftlang/swift/issues/75256
+      let body = PlainText(
+        text: """
+          Hello, World!
+          こんにちは、世界！
+          """,
+        stringEncoding: .iso2022JP,
+        contentTransferEncoding: ._7bit
+      )
+      let message = MailMessage(
+        author: try #require(Person(displayName: "Author", mailAddress: "author@example.com")),
+        recipients: Group([
+          try #require(Person(displayName: "Recipient", mailAddress: "recipient@example.com")),
+        ]),
+        subject: "My First Mail Message. - 私の初めてのメールメッセージ -",
+        body: body
+      )
 
-    #expect(
-      try message.deliverableDescription(using: .iso2022JP) ==
-      """
-      From: Author <author@example.com>\(CRLF)\
-      To: Recipient <recipient@example.com>\(CRLF)\
-      Subject: My First Mail Message. - =?iso-2022-jp?B?GyRCO2QkTj1pJGEbKEI=?=\(CRLF)\
-       =?iso-2022-jp?B?GyRCJEYkTiVhITwlayVhJUMlOyE8JTgbKEI=?= -\(CRLF)\
-      Content-Type: text/plain; charset=iso-2022-jp\(CRLF)\
-      Content-Transfer-Encoding: 7bit\(CRLF)\
-      \(CRLF)\
-      Hello, World!
-      \u{1B}$B$3$s$K$A$O!\"@$3&!*\u{1B}(B
-      """
-    )
+      #expect(
+        try message.deliverableDescription(using: .iso2022JP) ==
+        """
+        From: Author <author@example.com>\(CRLF)\
+        To: Recipient <recipient@example.com>\(CRLF)\
+        Subject: My First Mail Message. - =?iso-2022-jp?B?GyRCO2QkTj1pJGEbKEI=?=\(CRLF)\
+         =?iso-2022-jp?B?GyRCJEYkTiVhITwlayVhJUMlOyE8JTgbKEI=?= -\(CRLF)\
+        Content-Type: text/plain; charset=iso-2022-jp\(CRLF)\
+        Content-Transfer-Encoding: 7bit\(CRLF)\
+        \(CRLF)\
+        Hello, World!
+        \u{1B}$B$3$s$K$A$O!\"@$3&!*\u{1B}(B
+        """
+      )
+    }
   }
 
   @Test func test_contentTransferEncoding() throws {
@@ -1033,29 +1049,33 @@ final class MailMessageTests: XCTestCase {
       try "ひらがな ASCII 漢字".mimeEncodedString(using: .utf8),
       "=?utf-8?B?44Gy44KJ44GM44Gq?= ASCII =?utf-8?B?5ryi5a2X?="
     )
-    // Example from http://www.din.or.jp/~ohzaki/perl.htm#JP_Base64
-    XCTAssertEqual(
-      try "Subject: ASCII 日本語 ASCIIと日本語 ASCII ASCII".mimeEncodedString(using: .iso2022JP),
-      [
-        "Subject: ASCII =?iso-2022-jp?B?GyRCRnxLXDhsGyhCIEFTQ0lJGyRCJEhGfEtcGyhC?=",
-        "=?iso-2022-jp?B?GyRCOGwbKEI=?= ASCII ASCII",
-      ].joined(separator: "\u{0D}\u{0A}\u{20}")
-    )
+    try ifFoundationIssue1014IsFixed("Subject ISO-2022-JP Encoding") {
+      // Example from http://www.din.or.jp/~ohzaki/perl.htm#JP_Base64
+      XCTAssertEqual(
+        try "Subject: ASCII 日本語 ASCIIと日本語 ASCII ASCII".mimeEncodedString(using: .iso2022JP),
+        [
+          "Subject: ASCII =?iso-2022-jp?B?GyRCRnxLXDhsGyhCIEFTQ0lJGyRCJEhGfEtcGyhC?=",
+          "=?iso-2022-jp?B?GyRCOGwbKEI=?= ASCII ASCII",
+        ].joined(separator: "\u{0D}\u{0A}\u{20}")
+      )
+    }
   }
 
   func test_mimeEncode_parameter() throws {
-    XCTAssertEqual(
-      String(data: try _mimeEncodedParameter(
-        name: "filename",
-        value: "とてもとても長い長い日本語の名前のファイル.txt",
-        encoding: .iso2022JP,
-        locale: Locale(identifier: "ja_JP")
-      )),
-      """
-       filename*0*=iso-2022-jp'ja'%1B$B$H$F$b$H$F$bD9$$D9$$F%7CK%5C8l$N%1B%28B;\(CRLF)\
-       filename*1*=%1B$BL%3EA0$N%25U%25%21%25$%25k%1B%28B.txt
-      """
-    )
+    try ifFoundationIssue1014IsFixed {
+      XCTAssertEqual(
+        String(data: try _mimeEncodedParameter(
+          name: "filename",
+          value: "とてもとても長い長い日本語の名前のファイル.txt",
+          encoding: .iso2022JP,
+          locale: Locale(identifier: "ja_JP")
+        )),
+        """
+         filename*0*=iso-2022-jp'ja'%1B$B$H$F$b$H$F$bD9$$D9$$F%7CK%5C8l$N%1B%28B;\(CRLF)\
+         filename*1*=%1B$BL%3EA0$N%25U%25%21%25$%25k%1B%28B.txt
+        """
+      )
+    }
   }
 
   func test_mimeEncode_contentType() throws {
@@ -1085,37 +1105,39 @@ final class MailMessageTests: XCTestCase {
   }
 
   func test_plainText() throws {
-    let body = PlainText(
-      text: """
-        Hello, World!
-        こんにちは、世界！
-        """,
-      stringEncoding: .iso2022JP,
-      contentTransferEncoding: ._7bit
-    )
-    let message = MailMessage(
-      author: try XCTUnwrap(Person(displayName: "Author", mailAddress: "author@example.com")),
-      recipients: Group([
-        try XCTUnwrap(Person(displayName: "Recipient", mailAddress: "recipient@example.com")),
-      ]),
-      subject: "My First Mail Message. - 私の初めてのメールメッセージ -",
-      body: body
-    )
+    try ifFoundationIssue1014IsFixed {
+      let body = PlainText(
+        text: """
+          Hello, World!
+          こんにちは、世界！
+          """,
+        stringEncoding: .iso2022JP,
+        contentTransferEncoding: ._7bit
+      )
+      let message = MailMessage(
+        author: try XCTUnwrap(Person(displayName: "Author", mailAddress: "author@example.com")),
+        recipients: Group([
+          try XCTUnwrap(Person(displayName: "Recipient", mailAddress: "recipient@example.com")),
+        ]),
+        subject: "My First Mail Message. - 私の初めてのメールメッセージ -",
+        body: body
+      )
 
-    XCTAssertEqual(
-      try message.deliverableDescription(using: .iso2022JP),
-      """
-      From: Author <author@example.com>\(CRLF)\
-      To: Recipient <recipient@example.com>\(CRLF)\
-      Subject: My First Mail Message. - =?iso-2022-jp?B?GyRCO2QkTj1pJGEbKEI=?=\(CRLF)\
-       =?iso-2022-jp?B?GyRCJEYkTiVhITwlayVhJUMlOyE8JTgbKEI=?= -\(CRLF)\
-      Content-Type: text/plain; charset=iso-2022-jp\(CRLF)\
-      Content-Transfer-Encoding: 7bit\(CRLF)\
-      \(CRLF)\
-      Hello, World!
-      \u{1B}$B$3$s$K$A$O!\"@$3&!*\u{1B}(B
-      """
-    )
+      XCTAssertEqual(
+        try message.deliverableDescription(using: .iso2022JP),
+        """
+        From: Author <author@example.com>\(CRLF)\
+        To: Recipient <recipient@example.com>\(CRLF)\
+        Subject: My First Mail Message. - =?iso-2022-jp?B?GyRCO2QkTj1pJGEbKEI=?=\(CRLF)\
+         =?iso-2022-jp?B?GyRCJEYkTiVhITwlayVhJUMlOyE8JTgbKEI=?= -\(CRLF)\
+        Content-Type: text/plain; charset=iso-2022-jp\(CRLF)\
+        Content-Transfer-Encoding: 7bit\(CRLF)\
+        \(CRLF)\
+        Hello, World!
+        \u{1B}$B$3$s$K$A$O!\"@$3&!*\u{1B}(B
+        """
+      )
+    }
   }
 
   func test_contentTransferEncoding() throws {

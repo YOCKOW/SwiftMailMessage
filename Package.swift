@@ -44,6 +44,7 @@ let package = Package(
         "MailMessage",
         "SwiftNetworkGear",
         "SwiftXHTML",
+        "ySwiftExtensions",
       ]
     ),
   ],
