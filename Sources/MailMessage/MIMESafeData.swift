@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  MIMESafeData.swift
-   © 2021 YOCKOW.
+   © 2021,2024 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -13,7 +13,8 @@ public struct UInt7: Equatable,
                      AdditiveArithmetic,
                      Numeric,
                      ExpressibleByIntegerLiteral,
-                     Strideable {
+                     Strideable,
+                     Sendable {
   public typealias Magnitude = UInt8
   public typealias IntegerLiteralType = UInt8
   public typealias Stride = UInt8.Stride
@@ -91,7 +92,8 @@ public struct MIMESafeData: Equatable,
                             BidirectionalCollection,
                             RangeReplaceableCollection,
                             RandomAccessCollection,
-                            MutableCollection {
+                            MutableCollection,
+                            Sendable {
   public typealias Element = UInt7
   public typealias Index = Data.Index
   public typealias SubSequence = MIMESafeData

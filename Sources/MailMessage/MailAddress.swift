@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  MailAddress.swift
-   © 2022-2023 YOCKOW.
+   © 2022-2024 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -54,7 +54,7 @@ private extension Unicode.Scalar {
   }
 }
 
-public enum MailAddressParserError: Error, Equatable {
+public enum MailAddressParserError: Error, Equatable, Sendable {
   // MARK: - Lexer Errors
 
   case unterminatedQuotedString
@@ -439,8 +439,8 @@ extension MailAddressSyntaxNode {
 
 /// Represents a mail address based on [RFC 7504](https://www.rfc-editor.org/info/rfc7504) and
 /// [RFC6854](https://www.rfc-editor.org/info/rfc6854).
-public struct MailAddress: Equatable, Hashable, LosslessStringConvertible {
-  public enum DomainPart: Equatable, Hashable, LosslessStringConvertible {
+public struct MailAddress: Equatable, Hashable, LosslessStringConvertible, Sendable {
+  public enum DomainPart: Equatable, Hashable, LosslessStringConvertible, Sendable {
     case domain(Domain)
     case ipAddress(IPAddress)
 

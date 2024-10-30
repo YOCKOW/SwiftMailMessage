@@ -11,12 +11,17 @@ import NetworkGear
 /// Represents entire mail message
 @dynamicMemberLookup
 public struct MailMessage {
-  public struct Header: Sequence {
+  public struct Header: Sequence, Sendable {
     // At first, I was considering using `HTTPHeader` in `NetworkGear` module.
     // It validates, however, strictly its value.
     // I gave up and implement original `Header` for that reason.
 
-    public struct Name: Equatable, Comparable, Hashable, ExpressibleByStringLiteral, CustomStringConvertible {
+    public struct Name: Equatable,
+                        Comparable,
+                        Hashable,
+                        ExpressibleByStringLiteral,
+                        CustomStringConvertible,
+                        Sendable {
       /// "From"
       public static let from: Name = "From"
 

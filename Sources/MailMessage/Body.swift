@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  Body.swift
-   © 2021 YOCKOW.
+   © 2021,2024 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -28,7 +28,7 @@ public protocol MainBody: Body {
 }
 
 /// Represents plain text.
-public struct PlainText: MainBody {
+public struct PlainText: MainBody, Sendable {
   /// The mail message.
   public let text: String
 

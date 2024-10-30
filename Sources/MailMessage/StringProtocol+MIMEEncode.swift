@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  StringProtocol.swift
-   © 2021 YOCKOW.
+   © 2021,2024 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -177,7 +177,7 @@ internal final class _Parser {
   }
 }
 
-enum MIMEEncodingError: Error {
+public enum MIMEEncodingError: Error, Equatable, Sendable {
   case noCharacterSetName
   case dataConversionFailure
   case percentEncodingFailure
