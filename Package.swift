@@ -18,7 +18,6 @@ let package = Package(
   dependencies: [
     // Dependencies declare other packages that this package depends on.
     .package(url:"https://github.com/YOCKOW/SwiftNetworkGear.git", "0.19.1"..<"2.0.0"),
-    .package(url:"https://github.com/YOCKOW/SwiftPredicate.git", from: "1.3.0"),
     .package(url:"https://github.com/YOCKOW/SwiftRanges.git", from: "3.2.1"),
     .package(url:"https://github.com/YOCKOW/SwiftUnicodeSupplement.git", from: "1.5.0"),
     .package(url:"https://github.com/YOCKOW/SwiftXHTML.git", from: "2.8.0"),
@@ -31,7 +30,6 @@ let package = Package(
       name: "MailMessage",
       dependencies: [
         "SwiftNetworkGear",
-        "SwiftPredicate",
         "SwiftRanges",
         "SwiftUnicodeSupplement",
         "SwiftXHTML",

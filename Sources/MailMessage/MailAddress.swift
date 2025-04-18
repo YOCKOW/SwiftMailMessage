@@ -1,12 +1,11 @@
 /* *************************************************************************************************
  MailAddress.swift
-   © 2022-2024 YOCKOW.
+   © 2022-2025 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
 
 import NetworkGear
-import Predicate
 import Ranges
 import yExtensions
 
