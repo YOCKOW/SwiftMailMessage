@@ -13,7 +13,7 @@ import yExtensions
 import Testing
 
 func ifFoundationIssue1014IsFixed(_ name: String = #function, _ body: () throws -> Void) rethrows {
-  #if compiler(>=6) /* && compiler(<6.2) */ && !canImport(Darwin)
+  #if compiler(>=6) && compiler(<6.2) && !canImport(Darwin)
   warn("⏭︎ Test '\(name)' is skipped due to https://github.com/swiftlang/swift-foundation/issues/1014")
   #else
   try body()
