@@ -21,7 +21,7 @@ let package = Package(
     .package(url:"https://github.com/YOCKOW/SwiftRanges.git", from: "3.2.1"),
     .package(url:"https://github.com/YOCKOW/SwiftUnicodeSupplement.git", from: "1.5.0"),
     .package(url:"https://github.com/YOCKOW/SwiftXHTML.git", from: "2.8.0"),
-    .package(url:"https://github.com/YOCKOW/ySwiftExtensions.git", from: "1.11.1"),
+    .package(url:"https://github.com/YOCKOW/ySwiftExtensions.git", from: "1.12.1"),
   ],
   targets: [
     // Targets are the basic building blocks of a package. A target can define a module or a test suite.
