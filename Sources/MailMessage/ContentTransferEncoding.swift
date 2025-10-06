@@ -7,6 +7,7 @@
 
 import Foundation
 import NetworkGear
+import yExtensions
 
 public enum ContentTransferEncodingError: Error, Sendable {
   case cannotEncode
@@ -23,7 +24,7 @@ extension DataProtocol {
       }
       return safeData
     case .base64:
-      return MIMESafeData(_mimeSafeBytes: Data(self).base64EncodedData(options: .lineLength76Characters))
+      return MIMESafeData(_mimeSafeBytes: self.base64EncodedData(options: .lineLength76Characters))
     case .quotedPrintable:
       return MIMESafeData(_mimeSafeBytes: Data(self).quotedPrintableEncodedData(options: .regardAsBinary))
     default:
@@ -110,7 +111,7 @@ public final class ContentTransferEncodingStream: MIMESafeInputStream {
       assert(data.count <= sizePerRead)
 
       var result = MIMESafeData()
-      result.append(contentsOf: data.base64EncodedData(options: .lineLength76Characters))
+      result.append(contentsOf: (data as any DataProtocol).base64EncodedData(options: .lineLength76Characters))
 
       // Workaround for https://bugs.swift.org/browse/SR-14496
       #if canImport(Darwin) || swift(>=5.6)

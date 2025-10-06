@@ -319,7 +319,7 @@ extension StringProtocol {
         guard let stringData = String(scalarsToBeInThisLine).data(using: encoding) else {
           throw MIMEEncodingError.dataConversionFailure
         }
-        let encoded = MIMESafeData(_mimeSafeBytes: stringData.base64EncodedData())
+        let encoded = MIMESafeData(_mimeSafeBytes: (stringData as any DataProtocol).base64EncodedData())
         assert(encoded.count <= maxEncodedByteCount)
         let newLastLine = lastLine + startEncodedText + encoded + endEncodedText
         lines._replaceLastElement(with: newLastLine)
