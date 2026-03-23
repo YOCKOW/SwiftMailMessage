@@ -427,7 +427,7 @@ internal func _mimeEncodedParameter(
   guard let charset = encoding.ianaCharacterSetName else {
     throw MIMEEncodingError.noCharacterSetName
   }
-  let langTag = locale?.languageCode ?? ""
+  let langTag = locale?.language.languageCode?.identifier ?? ""
 
   let firstLine = MIMESafeData(
     _mimeSafeBytes: Data((encoding == .ascii ? " \(name)*0=" : " \(name)*0*=\(charset)'\(langTag)'").utf8)

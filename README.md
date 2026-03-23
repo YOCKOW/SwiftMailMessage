@@ -5,12 +5,13 @@ It does *not* provide functions like a mailer.
 
 # Requirements
 
-- Swift 5, 6
-- macOS(>=10.15) or Linux
+- Swift >=6.2
+- macOS(>=13.0) or Linux
 
 ## Dependencies
 
-![Dependencies](./dependencies.svg)
+<!-- SWIFT PACKAGE DEPENDENCIES MERMAID START -->
+<!-- SWIFT PACKAGE DEPENDENCIES MERMAID END -->
 
 
 # Usage
