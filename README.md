@@ -18,14 +18,14 @@ title: MailMessage Dependencies
 flowchart TD
   swiftbootstring(["Bootstring<br>@1.2.0"])
   swiftmailmessage["MailMessage"]
-  swiftnetworkgear(["NetworkGear<br>@0.20.0"])
-  swiftpublicsuffix(["PublicSuffix<br>@2.4.13"])
-  swiftranges(["Ranges<br>@4.0.1"])
+  swiftnetworkgear(["NetworkGear<br>@0.21.1"])
+  swiftpublicsuffix(["PublicSuffix<br>@2.4.29"])
+  swiftranges(["Ranges<br>@4.0.2"])
   swiftstringcomposition(["StringComposition<br>@3.0.0"])
   swifttemporaryfile(["TemporaryFile<br>@5.0.0"])
-  swiftunicodesupplement(["UnicodeSupplement<br>@2.0.0"])
+  swiftunicodesupplement(["UnicodeSupplement<br>@2.0.1"])
   swiftxhtml(["XHTML<br>@3.0.0"])
-  yswiftextensions(["yExtensions<br>@2.0.0"])
+  yswiftextensions(["yExtensions<br>@2.2.1"])
 
   click swiftbootstring href "https://github.com/YOCKOW/SwiftBootstring.git"
   click swiftnetworkgear href "https://github.com/YOCKOW/SwiftNetworkGear.git"
