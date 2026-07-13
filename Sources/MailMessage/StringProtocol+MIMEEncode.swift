@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  StringProtocol.swift
-   © 2021,2024 YOCKOW.
+   © 2021,2024,2026 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -418,10 +418,10 @@ internal func _mimeEncodedParameter(
 
   if value.unicodeScalars.allSatisfy(\.isMIMETypeToken) &&
       nameCount + 1 + value.count < nPerLine {
-    return try " \(name)=\(value)".mimeSafeData(using: ._7bit, stringEncoding: .utf8)
+    return try " \(name)=\(value)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8)
   } else if let quoted = value._quoted,
             quoted.compareCount(with: nPerLine - nameCount - 1) == .orderedAscending {
-    return try " \(name)=\(quoted)".mimeSafeData(using: ._7bit, stringEncoding: .utf8)
+    return try " \(name)=\(quoted)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8)
   }
 
   guard let charset = encoding.ianaCharacterSetName else {
@@ -480,7 +480,7 @@ internal func _mimeEncodedParameter(
   return result
 }
 
-private func _mimeEncodedHeaderField(
+internal func _mimeEncodedHeaderField(
   name: MailMessage.Header.Name,
   coreValue: String,
   parameters: [String: String]?,
@@ -490,7 +490,7 @@ private func _mimeEncodedHeaderField(
     return try _mimeEncodedHeaderField(name: name, value: coreValue, encoding: encoding)
   }
 
-  var result = try "\(name.description): \(coreValue)".mimeSafeData(using: ._7bit, stringEncoding: .utf8)
+  var result = try "\(name.description): \(coreValue)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8)
 
   let parameterPairs = parameters.sorted(by: { $0.key < $1.key })
   var ii = 0
@@ -500,10 +500,10 @@ private func _mimeEncodedHeaderField(
     let nameCount = name.count
     if value.unicodeScalars.allSatisfy(\.isMIMETypeToken) &&
         result.count + 2 + nameCount + 1 + value.count < 76 {
-      result += try "; \(name)=\(value)".mimeSafeData(using: ._7bit, stringEncoding: .utf8)
+      result += try "; \(name)=\(value)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8)
     } else if let quoted = value._quoted,
               quoted.compareCount(with: 76 - result.count - 2 - nameCount - 1) == .orderedAscending {
-      result += try "; \(name)=\(quoted)".mimeSafeData(using: ._7bit, stringEncoding: .utf8)
+      result += try "; \(name)=\(quoted)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8)
     } else {
       break
     }
@@ -531,23 +531,11 @@ internal func _mimeEncodedContentTypeHeaderField(
     subtype: contentType.subtype,
     suffix: contentType.suffix,
     parameters: nil
-  )!
+  )
   return try _mimeEncodedHeaderField(
     name: .contentType,
     coreValue: coreType.description,
-    parameters: contentType.parameters,
-    encoding: encoding
-  )
-}
-
-internal func _mimeEncodedContentDispositionHeaderField(
-  _ disposition: ContentDisposition,
-  encoding: String.Encoding
-) throws -> MIMESafeData {
-  return try _mimeEncodedHeaderField(
-    name: .contentDisposition,
-    coreValue: disposition.value.rawValue,
-    parameters: disposition.parameters?.reduce(into: [:], { $0[$1.key.rawValue] = $1.value }),
+    parameters: contentType.parameters?.reduce(into: [:], { $0[$1.key.description] = $1.value }),
     encoding: encoding
   )
 }

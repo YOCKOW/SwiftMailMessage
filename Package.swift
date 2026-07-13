@@ -17,11 +17,11 @@ let package = Package(
   ],
   dependencies: [
     // Dependencies declare other packages that this package depends on.
-    .package(url:"https://github.com/YOCKOW/SwiftNetworkGear.git", "0.20.0"..<"2.0.0"),
+    .package(url:"https://github.com/YOCKOW/SwiftNetworkGear.git", "0.21.1"..<"2.0.0"),
     .package(url:"https://github.com/YOCKOW/SwiftRanges.git", from: "4.0.1"),
-    .package(url:"https://github.com/YOCKOW/SwiftUnicodeSupplement.git", from: "2.0.0"),
+    .package(url:"https://github.com/YOCKOW/SwiftUnicodeSupplement.git", from: "2.0.1"),
     .package(url:"https://github.com/YOCKOW/SwiftXHTML.git", from: "3.0.0"),
-    .package(url:"https://github.com/YOCKOW/ySwiftExtensions.git", from: "2.0.0"),
+    .package(url:"https://github.com/YOCKOW/ySwiftExtensions.git", from: "2.2.1"),
   ],
   targets: [
     // Targets are the basic building blocks of a package. A target can define a module or a test suite.

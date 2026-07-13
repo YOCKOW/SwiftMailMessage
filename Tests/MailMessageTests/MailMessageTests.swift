@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  MailMessageTests.swift
-   © 2021,2024 YOCKOW.
+   © 2021,2024,2026 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -355,11 +355,11 @@ private extension MIMESafeInputStream {
   }
 
   @Test func test_mimeEncode_contentType() throws {
-    let contentType = try #require(MIMEType(
+    let contentType = MIMEType(
       type: .application,
       subtype: "xhtml+xml",
-      parameters: ["charset": "utf-8"]
-    ))
+      parameters: [.charset: "utf-8"]
+    )
     #expect(
       String(data: try _mimeEncodedContentTypeHeaderField(contentType, encoding: .utf8)) ==
       "Content-Type: application/xhtml+xml; charset=utf-8\(CRLF)"
@@ -388,10 +388,10 @@ private extension MIMESafeInputStream {
           こんにちは、世界！
           """,
         stringEncoding: .iso2022JP,
-        contentTransferEncoding: ._7bit
+        contentTransferEncoding: .`7bit`
       )
       let message = MailMessage(
-        author: try #require(Person(displayName: "Author", mailAddress: "author@example.com")),
+        author: try #require(Person(displayName: "Author", mailAddress: "author@example.com") as Person?),
         recipients: Group([
           try #require(Person(displayName: "Recipient", mailAddress: "recipient@example.com")),
         ]),

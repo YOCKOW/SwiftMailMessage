@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  Body.swift
-   © 2021,2024 YOCKOW.
+   © 2021,2024,2026 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -38,15 +38,7 @@ public struct PlainText: MainBody, Sendable {
     guard let charset = stringEncoding.ianaCharacterSetName else {
       fatalError("Cannot recognize the string encoding.")
     }
-    return MIMEType(
-      type: .text,
-      tree: nil,
-      subtype: "plain",
-      suffix: nil,
-      parameters: [
-        "charset": charset
-      ]
-    )!
+    return .plainText(charset: charset)
   }
 
   public let contentTransferEncoding: ContentTransferEncoding
@@ -114,9 +106,9 @@ public struct RichText: MainBody {
         type: .text,
         subtype: "html",
         parameters: [
-          "charset": charset
+          .charset: charset
         ]
-      )!
+      )
     }
 
     public init(
@@ -153,10 +145,10 @@ public struct RichText: MainBody {
           type: .multipart,
           subtype: "related",
           parameters: [
-            "boundary": boundary,
+            .boundary: boundary,
             "type": "text/html",
           ]
-        )!
+        )
         streams.append(
           MIMESafeDataStream(
             try _mimeEncodedContentTypeHeaderField(contentType, encoding: stringEncoding)
@@ -229,9 +221,9 @@ public struct RichText: MainBody {
       type: .multipart,
       subtype: "alternative",
       parameters: [
-        "boundary": boundary,
+        .boundary: boundary,
       ]
-    )!
+    )
   }
 
   public var contentTransferEncoding: ContentTransferEncoding {
@@ -256,17 +248,17 @@ public struct RichText: MainBody {
       var streams: [MIMESafeInputStream] = []
 
       streams.append(
-        MIMESafeDataStream(try "--\(boundary)".mimeSafeData(using: ._7bit, stringEncoding: .utf8) + .CRLF)
+        MIMESafeDataStream(try "--\(boundary)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8) + .CRLF)
       )
       streams.append(LazyMIMESafeInputStream { try plainText._stream() })
       streams.append(MIMESafeDataStream(.CRLF))
       streams.append(
-        MIMESafeDataStream(try "--\(boundary)".mimeSafeData(using: ._7bit, stringEncoding: .utf8) + .CRLF)
+        MIMESafeDataStream(try "--\(boundary)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8) + .CRLF)
       )
       streams.append(LazyMIMESafeInputStream { try htmlContent._stream() })
       streams.append(MIMESafeDataStream(.CRLF))
       streams.append(
-        MIMESafeDataStream(try "--\(boundary)--".mimeSafeData(using: ._7bit, stringEncoding: .utf8) + .CRLF)
+        MIMESafeDataStream(try "--\(boundary)--".mimeSafeData(using: .`7bit`, stringEncoding: .utf8) + .CRLF)
       )
 
       return MIMESafeInputSequenceStream(streams)
@@ -289,9 +281,9 @@ public struct FileAttachedBody: Body {
       type: .multipart,
       subtype: "mixed",
       parameters: [
-        "boundary": boundary,
+        .boundary: boundary,
       ]
-    )!
+    )
   }
 
   public var contentTransferEncoding: ContentTransferEncoding {
@@ -320,18 +312,18 @@ public struct FileAttachedBody: Body {
 
       let attachmentsStream = MIMESafeInputSequenceStream(try files.map({ (file) throws-> MIMESafeInputStream  in
         return MIMESafeInputSequenceStream([
-          MIMESafeDataStream(try "--\(boundary)".mimeSafeData(using: ._7bit, stringEncoding: .utf8) + .CRLF) as MIMESafeInputStream,
+          MIMESafeDataStream(try "--\(boundary)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8) + .CRLF) as MIMESafeInputStream,
           LazyMIMESafeInputStream { try file._stream.get() },
         ])
       }))
 
       return MIMESafeInputSequenceStream([
         MIMESafeDataStream(try "This is a multi-part message in MIME format.".mimeEncodedData(using: .utf8) + .CRLF + .CRLF),
-        MIMESafeDataStream(try "--\(boundary)".mimeSafeData(using: ._7bit, stringEncoding: .utf8) + .CRLF),
+        MIMESafeDataStream(try "--\(boundary)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8) + .CRLF),
         mainBodyStream,
         MIMESafeDataStream(.CRLF),
         attachmentsStream,
-        MIMESafeDataStream(try "--\(boundary)--".mimeSafeData(using: ._7bit, stringEncoding: .utf8) + .CRLF),
+        MIMESafeDataStream(try "--\(boundary)--".mimeSafeData(using: .`7bit`, stringEncoding: .utf8) + .CRLF),
       ] as [MIMESafeInputStream])
     }
   }

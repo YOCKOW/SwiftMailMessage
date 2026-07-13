@@ -1,6 +1,6 @@
 /* *************************************************************************************************
  ContentTransferEncoding.swift
-   © 2021,2024 YOCKOW.
+   © 2021,2024,2026 YOCKOW.
      Licensed under MIT License.
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
@@ -18,7 +18,7 @@ public enum ContentTransferEncodingError: Error, Sendable {
 extension DataProtocol {
   public func mimeSafeData(using encoding: ContentTransferEncoding) throws -> MIMESafeData {
     switch encoding {
-    case ._7bit:
+    case .`7bit`:
       guard let safeData = MIMESafeData(data: self) else {
         throw ContentTransferEncodingError.cannotEncode
       }
@@ -90,7 +90,7 @@ public final class ContentTransferEncodingStream: MIMESafeInputStream {
   }
 
   private static let _encoders: [ContentTransferEncoding: @Sendable (ContentTransferEncodingStream) throws -> MIMESafeData?] = [
-    ._7bit: {
+    .`7bit`: {
       guard let data = try $0.input._getBytes($0._buffer, maxLength: $0._bufferSize),
             !data.isEmpty else {
         return nil
