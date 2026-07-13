@@ -165,7 +165,7 @@ public struct File {
 
   public init(
     filename: String,
-    contentType: MIMEType = MIMEType(type: .application, subtype: "octet-stream")!,
+    contentType: MIMEType = .octetStream,
     contentID: ContentID = .random(),
     content: InputStream
   ) {
@@ -177,16 +177,15 @@ public struct File {
 
   internal var _stream: Result<MIMESafeInputStream, Error> {
     return Result<MIMESafeInputStream, Error> {
-      let contentDispotision = ContentDisposition(
-        value: .attachment,
-        parameters: [
-          .filename: filename,
-        ]
-      )
-
       return MIMESafeInputSequenceStream([
         MIMESafeDataStream(
-          try _mimeEncodedContentDispositionHeaderField(contentDispotision, encoding: .utf8)
+          // FIXME: I want to use `ParamterList`.
+          try _mimeEncodedHeaderField(
+            name: .contentDisposition,
+            coreValue: ContentDisposition.DispositionType.attachment.rawValue,
+            parameters: ["filename": filename],
+            encoding: .utf8
+          )
         ),
         MIMESafeDataStream(try _mimeEncodedContentTypeHeaderField(contentType, encoding: .utf8)),
         MIMESafeDataStream(
