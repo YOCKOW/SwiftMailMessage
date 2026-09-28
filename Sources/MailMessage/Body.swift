@@ -35,7 +35,7 @@ public struct PlainText: MainBody, Sendable {
   public let stringEncoding: String.Encoding
 
   public var contentType: MIMEType {
-    guard let charset = stringEncoding.ianaCharacterSetName else {
+    guard let charset = stringEncoding.ianaCharsetName else {
       fatalError("Cannot recognize the string encoding.")
     }
     return .plainText(charset: charset)
@@ -97,7 +97,7 @@ public struct RichText: MainBody {
     public internal(set) var boundary: String
 
     public var contentType: MIMEType {
-      guard let charset = stringEncoding.ianaCharacterSetName else {
+      guard let charset = stringEncoding.ianaCharsetName else {
         fatalError("Cannot recognize the string encoding.")
       }
       // I don't know why

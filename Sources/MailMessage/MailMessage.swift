@@ -382,7 +382,7 @@ extension MailMessage {
       )
     }
 
-    try output.write(.CRLF) // End of Header
+    try output.write(MIMESafeData([0x0D, 0x0A])) // End of Header
 
     var contentStream = try body.content.get()
     while let bytes = try contentStream.nextFragment() {

@@ -22,6 +22,9 @@ func ifFoundationIssue1014IsFixed(_ name: String = #function, _ body: () throws 
 
 private let CRLF: String = "\u{0D}\u{0A}"
 private let resourcesDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources", isDirectory: true)
+private let utf8Description = String.Encoding.utf8.ianaCharsetName!
+private let iso2022JPDescription = String.Encoding.iso2022JP.ianaCharsetName!
+private let usASCIIDescription = String.Encoding.ascii.ianaCharsetName!
 
 private extension MIMESafeInputStream {
   mutating func _availableData() throws -> MIMESafeData {
@@ -322,7 +325,7 @@ private extension MIMESafeInputStream {
     #expect(try "Only ASCII".mimeEncodedString(using: .utf8) == "Only ASCII")
     #expect(
       try "ひらがな ASCII 漢字".mimeEncodedString(using: .utf8) ==
-      "=?utf-8?B?44Gy44KJ44GM44Gq?= ASCII =?utf-8?B?5ryi5a2X?="
+      "=?\(utf8Description)?B?44Gy44KJ44GM44Gq?= ASCII =?\(utf8Description)?B?5ryi5a2X?="
     )
 
     try ifFoundationIssue1014IsFixed("Subject ISO-2022-JP Encoding") { () throws -> Void in // https://github.com/swiftlang/swift/issues/75256
@@ -330,8 +333,8 @@ private extension MIMESafeInputStream {
       #expect(
         try "Subject: ASCII 日本語 ASCIIと日本語 ASCII ASCII".mimeEncodedString(using: .iso2022JP) ==
         [
-          "Subject: ASCII =?iso-2022-jp?B?GyRCRnxLXDhsGyhCIEFTQ0lJGyRCJEhGfEtcGyhC?=",
-          "=?iso-2022-jp?B?GyRCOGwbKEI=?= ASCII ASCII",
+          "Subject: ASCII =?\(iso2022JPDescription)?B?GyRCRnxLXDhsGyhCIEFTQ0lJGyRCJEhGfEtcGyhC?=",
+          "=?\(iso2022JPDescription)?B?GyRCOGwbKEI=?= ASCII ASCII",
         ].joined(separator: "\u{0D}\u{0A}\u{20}")
       )
     }
@@ -347,7 +350,7 @@ private extension MIMESafeInputStream {
           locale: Locale(identifier: "ja_JP")
         )) ==
         """
-         filename*0*=iso-2022-jp'ja'%1B$B$H$F$b$H$F$bD9$$D9$$F%7CK%5C8l$N%1B%28B;\(CRLF)\
+         filename*0*=\(iso2022JPDescription)'ja'%1B$B$H$F$b$H$F$bD9$$D9$$F%7CK%5C8l$N%1B%28B;\(CRLF)\
          filename*1*=%1B$BL%3EA0$N%25U%25%21%25$%25k%1B%28B.txt
         """
       )
@@ -404,9 +407,9 @@ private extension MIMESafeInputStream {
         """
         From: Author <author@example.com>\(CRLF)\
         To: Recipient <recipient@example.com>\(CRLF)\
-        Subject: My First Mail Message. - =?iso-2022-jp?B?GyRCO2QkTj1pJGEbKEI=?=\(CRLF)\
-         =?iso-2022-jp?B?GyRCJEYkTiVhITwlayVhJUMlOyE8JTgbKEI=?= -\(CRLF)\
-        Content-Type: text/plain; charset=iso-2022-jp\(CRLF)\
+        Subject: My First Mail Message. - =?\(iso2022JPDescription)?B?GyRCO2QkTj1pJGEbKEI=?=\(CRLF)\
+         =?\(iso2022JPDescription)?B?GyRCJEYkTiVhITwlayVhJUMlOyE8JTgbKEI=?= -\(CRLF)\
+        Content-Type: text/plain; charset=\(iso2022JPDescription)\(CRLF)\
         Content-Transfer-Encoding: 7bit\(CRLF)\
         \(CRLF)\
         Hello, World!
@@ -538,7 +541,7 @@ private extension MIMESafeInputStream {
       String(data: try pngFileStream._availableData()) ==
       """
       Content-Disposition: attachment;\(CRLF)\
-       filename*0*=utf-8''%E7%B9%B0%E3%82%8A%E8%BF%94%E3%81%97%E3%82%92%E9%81%A9;\(CRLF)\
+       filename*0*=\(utf8Description)''%E7%B9%B0%E3%82%8A%E8%BF%94%E3%81%97%E3%82%92%E9%81%A9;\(CRLF)\
        filename*1*=%E7%94%A8%E3%81%99%E3%82%8B%E3%81%93%E3%81%A8%E3%81%A7;\(CRLF)\
        filename*2*=%E6%A8%AA%E7%B8%9E%E6%A8%A1%E6%A7%98%E3%81%AB%E4%BD%BF;\(CRLF)\
        filename*3*=%E3%81%86%E3%81%93%E3%81%A8%E3%81%8C%E3%81%A7%E3%81%8D;\(CRLF)\
@@ -583,15 +586,15 @@ private extension MIMESafeInputStream {
       Content-Transfer-Encoding: quoted-printable\(CRLF)\
       \(CRLF)\
       --test-boundary\(CRLF)\
-      Content-Type: text/plain; charset=utf-8\(CRLF)\
+      Content-Type: text/plain; charset=\(utf8Description)\(CRLF)\
       Content-Transfer-Encoding: quoted-printable\(CRLF)\
       \(CRLF)\
       Hello, HTML!\(CRLF)\
       --test-boundary\(CRLF)\
-      Content-Type: text/html; charset=utf-8\(CRLF)\
+      Content-Type: text/html; charset=\(utf8Description)\(CRLF)\
       Content-Transfer-Encoding: quoted-printable\(CRLF)\
       \(CRLF)\
-      <?xml version=3D"1.0" encoding=3D"utf-8"?>\(CRLF)\
+      <?xml version=3D"1.0" encoding=3D"\(utf8Description)"?>\(CRLF)\
       <!DOCTYPE html>\(CRLF)\
       <html xmlns=3D"http://www.w3.org/1999/xhtml"><head><title>XHTML Title</titl=\(CRLF)\
       e></head><body><div>XHTML</div></body></html>\(CRLF)\
@@ -624,7 +627,7 @@ private extension MIMESafeInputStream {
       This is a multi-part message in MIME format.\(CRLF)\
       \(CRLF)\
       --test-boundary\(CRLF)\
-      Content-Type: text/plain; charset=utf-8\(CRLF)\
+      Content-Type: text/plain; charset=\(utf8Description)\(CRLF)\
       Content-Transfer-Encoding: quoted-printable\(CRLF)\
       \(CRLF)\
       Hello, files!\(CRLF)\
@@ -637,7 +640,7 @@ private extension MIMESafeInputStream {
       \(shortTextFileBase64)\(CRLF)\
       --test-boundary\(CRLF)\
       Content-Disposition: attachment;\(CRLF)\
-       filename*0*=utf-8''%E7%B9%B0%E3%82%8A%E8%BF%94%E3%81%97%E3%82%92%E9%81%A9;\(CRLF)\
+       filename*0*=\(utf8Description)''%E7%B9%B0%E3%82%8A%E8%BF%94%E3%81%97%E3%82%92%E9%81%A9;\(CRLF)\
        filename*1*=%E7%94%A8%E3%81%99%E3%82%8B%E3%81%93%E3%81%A8%E3%81%A7;\(CRLF)\
        filename*2*=%E6%A8%AA%E7%B8%9E%E6%A8%A1%E6%A7%98%E3%81%AB%E4%BD%BF;\(CRLF)\
        filename*3*=%E3%81%86%E3%81%93%E3%81%A8%E3%81%8C%E3%81%A7%E3%81%8D;\(CRLF)\
@@ -694,7 +697,7 @@ private extension MIMESafeInputStream {
       Content-Transfer-Encoding: quoted-printable\(CRLF)\
       \(CRLF)\
       --test-rich-text-boundary\(CRLF)\
-      Content-Type: text/plain; charset=us-ascii\(CRLF)\
+      Content-Type: text/plain; charset=\(usASCIIDescription)\(CRLF)\
       Content-Transfer-Encoding: quoted-printable\(CRLF)\
       \(CRLF)\
       Hello, many resources!\(CRLF)\
@@ -704,17 +707,17 @@ private extension MIMESafeInputStream {
       Content-Transfer-Encoding: quoted-printable\(CRLF)\
       \(CRLF)\
       --test-html-boundary\(CRLF)\
-      Content-Type: text/html; charset=utf-8\(CRLF)\
+      Content-Type: text/html; charset=\(utf8Description)\(CRLF)\
       Content-Transfer-Encoding: quoted-printable\(CRLF)\
       \(CRLF)\
-      <?xml version=3D"1.0" encoding=3D"utf-8"?>\(CRLF)\
+      <?xml version=3D"1.0" encoding=3D"\(utf8Description)"?>\(CRLF)\
       <!DOCTYPE html>\(CRLF)\
       <html xmlns=3D"http://www.w3.org/1999/xhtml"><head><title>title</title></he=\(CRLF)\
       ad><body>Hello, image!<img src=3D"cid:test-pngFile@swift.mail.message" /></=\(CRLF)\
       body></html>\(CRLF)\
       --test-html-boundary\(CRLF)\
       Content-Disposition: attachment;\(CRLF)\
-       filename*0*=utf-8''%E7%B9%B0%E3%82%8A%E8%BF%94%E3%81%97%E3%82%92%E9%81%A9;\(CRLF)\
+       filename*0*=\(utf8Description)''%E7%B9%B0%E3%82%8A%E8%BF%94%E3%81%97%E3%82%92%E9%81%A9;\(CRLF)\
        filename*1*=%E7%94%A8%E3%81%99%E3%82%8B%E3%81%93%E3%81%A8%E3%81%A7;\(CRLF)\
        filename*2*=%E6%A8%AA%E7%B8%9E%E6%A8%A1%E6%A7%98%E3%81%AB%E4%BD%BF;\(CRLF)\
        filename*3*=%E3%81%86%E3%81%93%E3%81%A8%E3%81%8C%E3%81%A7%E3%81%8D;\(CRLF)\

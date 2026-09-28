@@ -5,6 +5,8 @@
      See "LICENSE.txt" for more information.
  ************************************************************************************************ */
 
+// TODO: Integrate with NetworkGear
+
 import Foundation
 import NetworkGear
 import yExtensions
@@ -16,6 +18,11 @@ public enum ContentTransferEncodingError: Error, Sendable {
 }
 
 extension DataProtocol {
+  @inlinable
+  internal var _asMIMESafeData: MIMESafeData {
+    return MIMESafeData(data: self)!
+  }
+
   public func mimeSafeData(using encoding: ContentTransferEncoding) throws -> MIMESafeData {
     switch encoding {
     case .`7bit`:
@@ -24,9 +31,9 @@ extension DataProtocol {
       }
       return safeData
     case .base64:
-      return MIMESafeData(_mimeSafeBytes: self.base64EncodedData(options: .lineLength76Characters))
+      return self.base64EncodedData(options: .lineLength76Characters)._asMIMESafeData
     case .quotedPrintable:
-      return MIMESafeData(_mimeSafeBytes: Data(self).quotedPrintableEncodedData(options: .regardAsBinary))
+      return Data(self).quotedPrintableEncodedData(options: .regardAsBinary)._asMIMESafeData
     default:
       throw ContentTransferEncodingError.non7bitRepresentation
     }
@@ -43,7 +50,7 @@ extension StringProtocol {
     }
     switch transferEncoding {
     case .quotedPrintable:
-      return MIMESafeData(_mimeSafeBytes: data.quotedPrintableEncodedData(options: .default))
+      return data.quotedPrintableEncodedData(options: .default)._asMIMESafeData
     default:
       return try data.mimeSafeData(using: transferEncoding)
     }
@@ -111,17 +118,10 @@ public final class ContentTransferEncodingStream: MIMESafeInputStream {
       assert(data.count <= sizePerRead)
 
       var result = MIMESafeData()
-      result.append(contentsOf: (data as any DataProtocol).base64EncodedData(options: .lineLength76Characters))
-
-      // Workaround for https://bugs.swift.org/browse/SR-14496
-      #if canImport(Darwin) || swift(>=5.6)
+      result.append(
+        contentsOf: (data as any DataProtocol).base64EncodedData(options: .lineLength76Characters)._asMIMESafeData
+      )
       result.append(contentsOf: .CRLF)
-      #else
-      if (1..<55).contains(data.count % numberOfBytesOfSourcePerLine) {
-        result.append(contentsOf: .CRLF)
-      }
-      #endif
-
       return result
     },
     .quotedPrintable: {
@@ -130,11 +130,11 @@ public final class ContentTransferEncodingStream: MIMESafeInputStream {
         return nil
       }
 
-      let softLineBreak = MIMESafeData([.EQ, .CR, .LF])
+      let softLineBreak = MIMESafeData([0x3D, 0x0D, 0x0A])
       var result = MIMESafeData()
-      result.append(contentsOf: data.quotedPrintableEncodedData(options: .regardAsBinary))
+      result.append(contentsOf: data.quotedPrintableEncodedData(options: .regardAsBinary)._asMIMESafeData)
       // To be safe, append "soft line break".
-      let countOfLastLine = result.endIndex - (result.lastIndex(of: .LF) ?? -1) - 1
+      let countOfLastLine = result.endIndex - (result.lastIndex(of: 0x0A) ?? -1) - 1
       switch countOfLastLine {
       case 0:
         // do nothing
@@ -142,7 +142,7 @@ public final class ContentTransferEncodingStream: MIMESafeInputStream {
       case ..<76:
         result.append(contentsOf: softLineBreak)
       case 76:
-        if result[result.endIndex - 3] == .EQ {
+        if result[result.endIndex - 3] == 0x3D {
           // For example:
           // .............=C3[End of Data]
           result.insert(contentsOf: softLineBreak, at: result.endIndex - 3)
