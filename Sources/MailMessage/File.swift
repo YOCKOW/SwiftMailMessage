@@ -202,7 +202,7 @@ public struct File {
             encoding: .utf8
           )
         ),
-        MIMESafeDataStream(.CRLF),
+        MIMESafeDataStream(MIMESafeData([0x0D, 0x0A])),
         try ContentTransferEncodingStream(content, encoding: .base64),
       ] as [MIMESafeInputStream])
     }

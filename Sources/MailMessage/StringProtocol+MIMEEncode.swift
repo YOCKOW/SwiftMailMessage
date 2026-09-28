@@ -54,7 +54,7 @@ private extension RangeReplaceableCollection {
 
 private extension Sequence where Element == Unicode.Scalar {
   var _ascii: MIMESafeData {
-    return MIMESafeData(_mimeSafeBytes: Data(self.flatMap({ $0.utf8 })))
+    return Data(self.flatMap({ $0.utf8 }))._asMIMESafeData
   }
 }
 
@@ -270,11 +270,11 @@ extension StringProtocol {
       return MIMESafeData()
     }
 
-    guard let encodingName = encoding.ianaCharacterSetName else {
+    guard let encodingName = encoding.ianaCharsetName else {
       throw MIMEEncodingError.noCharacterSetName
     }
-    let startEncodedText = MIMESafeData(_mimeSafeBytes: Data("=?\(encodingName)?B?".utf8))
-    let endEncodedText = MIMESafeData(_mimeSafeBytes: Data("?=".utf8))
+    let startEncodedText = Data("=?\(encodingName)?B?".utf8)._asMIMESafeData
+    let endEncodedText = Data("?=".utf8)._asMIMESafeData
 
     // reference: http://www.din.or.jp/~ohzaki/perl.htm#JP_Base64 (Japanese)
 
@@ -319,7 +319,7 @@ extension StringProtocol {
         guard let stringData = String(scalarsToBeInThisLine).data(using: encoding) else {
           throw MIMEEncodingError.dataConversionFailure
         }
-        let encoded = MIMESafeData(_mimeSafeBytes: (stringData as any DataProtocol).base64EncodedData())
+        let encoded = (stringData as any DataProtocol).base64EncodedData()._asMIMESafeData
         assert(encoded.count <= maxEncodedByteCount)
         let newLastLine = lastLine + startEncodedText + encoded + endEncodedText
         lines._replaceLastElement(with: newLastLine)
@@ -335,7 +335,8 @@ extension StringProtocol {
     var result = MIMESafeData()
     for line in lines.dropLast() {
       result += line
-      result += .CRLFSP
+      result += .CRLF
+      result.append(0x20)
     }
     result += lines.last!
     return result
@@ -424,20 +425,16 @@ internal func _mimeEncodedParameter(
     return try " \(name)=\(quoted)".mimeSafeData(using: .`7bit`, stringEncoding: .utf8)
   }
 
-  guard let charset = encoding.ianaCharacterSetName else {
+  guard let charset = encoding.ianaCharsetName else {
     throw MIMEEncodingError.noCharacterSetName
   }
   let langTag = locale?.language.languageCode?.identifier ?? ""
 
-  let firstLine = MIMESafeData(
-    _mimeSafeBytes: Data((encoding == .ascii ? " \(name)*0=" : " \(name)*0*=\(charset)'\(langTag)'").utf8)
-  )
+  let firstLine = Data((encoding == .ascii ? " \(name)*0=" : " \(name)*0*=\(charset)'\(langTag)'").utf8)._asMIMESafeData
   var lines: [MIMESafeData] = [firstLine]
   func __newLine() {
     lines.append(
-      MIMESafeData(
-        _mimeSafeBytes: Data((encoding == .ascii ? " \(name)*\(lines.count)=" : " \(name)*\(lines.count)*=").utf8)
-      )
+      Data((encoding == .ascii ? " \(name)*\(lines.count)=" : " \(name)*\(lines.count)*=").utf8)._asMIMESafeData
     )
   }
 
@@ -465,7 +462,7 @@ internal func _mimeEncodedParameter(
     guard let percentEncoded = String(String.UnicodeScalarView(scalarsToBeInThisLine)).data(using: encoding)?._addingPercentEncoding() else {
       throw MIMEEncodingError.percentEncodingFailure
     }
-    let encodedData = MIMESafeData(_mimeSafeBytes: percentEncoded)
+    let encodedData = percentEncoded._asMIMESafeData
     lines._replaceLastElement(with: lastLine + encodedData)
     restOfScalars = scalarsToBeNextLine
   }
